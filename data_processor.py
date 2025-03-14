@@ -20,8 +20,19 @@ def process_data():
     DAYS_PER_WEEK = 7
 
     while True:
+        
         latest_p = get_latest_power()
         dev_id = get_device_id()
+        last_minute = datetime.now(timezone.utc).replace(second=0, microsecond=0).date()
+
+        #wait for next minute
+        current_minute = datetime.now(timezone.utc).replace(second=0, microsecond=0).date()
+        while (last_minute == current_minute):
+            time.sleep(1)
+            current_minute = datetime.now(timezone.utc).replace(second=0, microsecond=0).date()
+        
+
+        last_minute = current_minute
 
         if latest_p is not None and dev_id is not None:
             current_time = datetime.now(timezone.utc).replace(second=0, microsecond=0)
@@ -32,7 +43,7 @@ def process_data():
             minutecounter += 1
             print(f"Minute-Counter: {minutecounter}")
 
-            # Hourly
+            # Save Hourly
             if minutecounter >= MINUTES_PER_HOUR:
                 hourly_avg = compute_and_save_hourly_consumption(current_time, dev_id)
                 if hourly_avg is not None:
@@ -54,5 +65,3 @@ def process_data():
                         daily_counter = 0
         else:
             print("Waiting for power data...")
-
-        time.sleep(60)

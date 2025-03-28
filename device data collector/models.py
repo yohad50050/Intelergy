@@ -54,7 +54,7 @@ class Room(BaseModel):
     devices = relationship("Device", backref="room")
 
 
-# Many-to-Many association for HistoricalHourlyConsumption with Devices
+# Many-to-Many association for HistoricalHourlyConsumption with those Devices
 historical_hourly_assoc = Table(
     "historical_hourly_assoc",
     Base.metadata,

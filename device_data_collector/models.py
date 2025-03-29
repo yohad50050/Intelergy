@@ -17,6 +17,7 @@ from sqlalchemy.dialects.mysql import ENUM
 from datetime import datetime
 import os
 from dotenv import load_dotenv
+from urllib.parse import quote_plus
 
 # Load environment variables
 load_dotenv()
@@ -27,11 +28,11 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_NAME = os.getenv("DB_NAME", "intelergy")
 
-# Create database URL
-DATABASE_URL = f"mysql+mysqlconnector://{DB_USERNAME}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}"
+# Create database URL with properly escaped password
+DATABASE_URL = f"mysql+mysqlconnector://{DB_USERNAME}:{quote_plus(DB_PASSWORD)}@{DB_HOST}/{DB_NAME}"
 
 # Create engine and session
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL, echo=True)  # Set echo=True to see SQL output
 Session = sessionmaker(bind=engine)
 session = Session()
 

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="refresh" content="5">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plug Control</title>
+</head>
+<body>
+    <h1>Plug Information</h1>
+    <p><strong>Voltage:</strong> {{ voltage }}</p>
+    <p><strong>Power:</strong> {{ power }}</p>
+    <p><strong>Status:</strong> {{ switch }}</p>
+    <p><strong>Temperature:</strong> {{ temperature }}</p>
+
+    <!-- Display the success or error message -->
+    {% if message %}
+        <p style="color: green;">{{ message }}</p>
+    {% endif %}
+
+    <h2>Control the Plug</h2>
+    <form method="POST" action="/">
+        <button type="submit" name="action" value="on">Turn ON</button>
+        <button type="submit" name="action" value="off">Turn OFF</button>
+    </form>
+</body>
+</html>

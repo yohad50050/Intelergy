@@ -9,14 +9,31 @@ from sqlalchemy import (
     func,
     Table,
     Numeric,
+    Float,
 )
-from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.dialects.mysql import ENUM
+from datetime import datetime
+import os
+from dotenv import load_dotenv
 
-# Database Setup
-engine = create_engine(
-    "mysql+mysqlconnector://root:MyNewPass@localhost/Intelergy", echo=True
-)
+# Load environment variables
+load_dotenv()
+
+# Database connection configuration
+DB_USERNAME = os.getenv("DB_USERNAME", "root")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_NAME = os.getenv("DB_NAME", "intelergy")
+
+# Create database URL
+DATABASE_URL = f"mysql+mysqlconnector://{DB_USERNAME}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}"
+
+# Create engine and session
+engine = create_engine(DATABASE_URL)
+Session = sessionmaker(bind=engine)
+session = Session()
 
 Base = declarative_base()
 
@@ -55,11 +72,9 @@ class Room(BaseModel):
     def total_power(self):
         total = 0
         for device in self.devices:
-            latest_consumption = (
-                device.minutely_consumptions
-                .order_by(MinutelyConsumption.time.desc())
-                .first()
-            )
+            latest_consumption = device.minutely_consumptions.order_by(
+                MinutelyConsumption.time.desc()
+            ).first()
             if latest_consumption:
                 total += float(latest_consumption.power_consumption)
         return total
@@ -155,5 +170,9 @@ class HistoricalHourlyConsumption(BaseModel):
     )
 
 
-# Base.metadata.drop_all(engine)
-# Base.metadata.create_all(engine)
+if __name__ == "__main__":
+    # Drop all tables first (be careful with this in production!)
+    Base.metadata.drop_all(engine)
+    # Create all tables
+    Base.metadata.create_all(engine)
+    print("Database tables created successfully!")

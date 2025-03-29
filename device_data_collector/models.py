@@ -51,6 +51,19 @@ class Room(BaseModel):
 
     devices = relationship("Device", backref="room")
 
+    @property
+    def total_power(self):
+        total = 0
+        for device in self.devices:
+            latest_consumption = (
+                device.minutely_consumptions
+                .order_by(MinutelyConsumption.time.desc())
+                .first()
+            )
+            if latest_consumption:
+                total += float(latest_consumption.power_consumption)
+        return total
+
 
 # Many-to-Many association for HistoricalHourlyConsumption with those Devices
 historical_hourly_assoc = Table(

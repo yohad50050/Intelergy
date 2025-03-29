@@ -131,9 +131,15 @@ def get_device_power(device_id):
         app.logger.debug(f"Weekly consumption: {weekly_consumption}")  # Debug log
 
         response = {
-            "power": float(latest_consumption.power_consumption) if latest_consumption else 0,
-            "weekly_average": float(weekly_consumption.weekly_average) if weekly_consumption else None,
-            "last_updated": latest_consumption.time.isoformat() if latest_consumption else None
+            "power": (
+                float(latest_consumption.power_consumption) if latest_consumption else 0
+            ),
+            "weekly_average": (
+                float(weekly_consumption.weekly_average) if weekly_consumption else None
+            ),
+            "last_updated": (
+                latest_consumption.time.isoformat() if latest_consumption else None
+            ),
         }
         app.logger.debug(f"Sending response: {response}")  # Debug log
         return jsonify(response)
@@ -192,7 +198,11 @@ def add_device():
         if not room:
             return jsonify({"error": "Room not found"}), 404
         new_device = Device(
-            room_id=room_id, name=name, device_url=device_url, type=device_type, status="ON"
+            room_id=room_id,
+            name=name,
+            device_url=device_url,
+            type=device_type,
+            status="ON",
         )
         session.add(new_device)
         session.commit()

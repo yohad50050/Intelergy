@@ -15,10 +15,8 @@ from sqlalchemy.dialects.mysql import ENUM
 
 # Database Setup
 engine = create_engine(
-    "mysql+mysqlconnector://Yohad:159357@localhost/Intelergy", echo=True
+    "mysql+mysqlconnector://root:MyNewPass@localhost/Intelergy", echo=True
 )
-Session = sessionmaker(bind=engine)
-session = Session()
 
 Base = declarative_base()
 

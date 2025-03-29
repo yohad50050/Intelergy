@@ -3,82 +3,138 @@
 {% block title %}{{ profile.name }}{% endblock %}
 
 {% block content %}
-<div class="bg-white shadow rounded-lg p-6">
-    <div class="flex justify-between items-center mb-6">
-        <h1 class="text-2xl font-semibold text-gray-900">{{ profile.name }}</h1>
-        <div class="space-x-4">
-            <button onclick="showAddRoomModal()" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-secondary transition-colors">
-                <i class="fas fa-plus mr-2"></i>Add Room
-            </button>
-            <a href="{{ url_for('index') }}" class="text-gray-600 hover:text-primary">
-                <i class="fas fa-arrow-left mr-2"></i>Back to Profiles
-            </a>
+<div class="min-h-screen" dir="rtl">
+    <!-- New Description Section -->
+    <div class="max-w-7xl mx-auto mb-8">
+        <div class="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-8 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <h1 class="text-3xl font-bold text-blue-900">שלום, {{ profile.name }}</h1>
+                <div class="flex items-center">
+                    <i class="fas fa-leaf text-green-500 text-3xl ml-2"></i>
+                    <span class="text-xl font-medium text-green-600">intelergy</span>
+                </div>
+            </div>
+            <p class="text-lg text-gray-600 mb-2">
+                ברוכים הבאים למערכת החכמה לניהול צריכת החשמל בבית שלך
+            </p>
+            <div class="flex flex-wrap gap-4 mt-4">
+                <div class="bg-green-100 rounded-lg p-3 flex items-center">
+                    <i class="fas fa-bolt text-green-600 mr-2"></i>
+                    <span class="text-green-800">מעקב צריכת חשמל בזמן אמת</span>
+                </div>
+                <div class="bg-green-100 rounded-lg p-3 flex items-center">
+                    <i class="fas fa-home text-green-600 mr-2"></i>
+                    <span class="text-green-800">ניהול חדרים ומכשירים</span>
+                </div>
+                <div class="bg-green-100 rounded-lg p-3 flex items-center">
+                    <i class="fas fa-chart-line text-green-600 mr-2"></i>
+                    <span class="text-green-800">ניתוח וחיסכון בחשמל</span>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {% for room in rooms %}
-        <div class="bg-white border rounded-lg shadow p-6">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-semibold text-gray-900">{{ room.name }}</h2>
-                <button onclick="showAddDeviceModal('{{ room.room_id }}')" 
-                        class="text-primary hover:text-secondary">
-                    <i class="fas fa-plus"></i>
+    <!-- Existing Content -->
+    <div class="max-w-7xl mx-auto">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold text-blue-900">{{ profile.name }}</h1>
+            <div class="space-x-4">
+                <button onclick="showAddRoomModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                    <i class="fas fa-plus mr-2"></i>הוסף חדר
                 </button>
+                <a href="{{ url_for('index') }}" class="text-blue-900 hover:text-blue-700">
+                    <i class="fas fa-arrow-right mr-2"></i>חזרה לפרופילים
+                </a>
             </div>
-            
-            <div class="space-y-4">
-                {% for device in room.devices %}
-                <div class="device-card p-4 border rounded-lg {% if device.status == 'OFF' %}opacity-50{% endif %}">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-3">
-                            <i class="fas fa-{{ get_device_icon(device.type) }} text-2xl text-primary"></i>
-                            <div>
-                                <h3 class="font-medium text-gray-900">{{ device.name }}</h3>
-                                <p class="text-sm text-gray-500">{{ device.type }}</p>
+        </div>
+
+        <!-- Rooms Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for room in rooms %}
+            <div class="bg-gradient-to-br from-blue-100 to-green-100 rounded-lg shadow p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-blue-900">{{ room.name }}</h2>
+                    <button onclick="showAddDeviceModal('{{ room.room_id }}')" 
+                            class="text-blue-600 hover:text-blue-700">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-4">
+                    {% for device in room.devices %}
+                    <div class="device-card bg-white p-4 rounded-lg shadow-sm {% if device.status == 'OFF' %}opacity-50{% endif %}">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <i class="fas fa-{{ device.type | get_device_icon }} text-2xl text-blue-600"></i>
+                                <div>
+                                    <h3 class="font-medium text-blue-900">{{ device.name }}</h3>
+                                    <p class="text-sm text-blue-700">{{ device.type }}</p>
+                                </div>
                             </div>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-sm font-medium text-gray-900 power-value" data-device-id="{{ device.device_id }}">
-                                <span class="loading">Loading...</span>
+                            <div class="text-right">
+                                <div class="text-sm font-medium text-blue-900 power-value" data-device-id="{{ device.device_id }}">
+                                    <span class="loading">טוען...</span>
+                                </div>
+                                <div class="text-xs text-blue-700">{{ device.status }}</div>
                             </div>
-                            <div class="text-xs text-gray-500">{{ device.status }}</div>
                         </div>
                     </div>
+                    {% else %}
+                    <p class="text-blue-700 text-center py-2">אין מכשירים בחדר זה</p>
+                    {% endfor %}
                 </div>
-                {% else %}
-                <p class="text-gray-500 text-center py-2">No devices in this room</p>
+            </div>
+            {% else %}
+            <div class="col-span-full text-center py-12">
+                <p class="text-blue-700">אין חדרים עדיין. הוסף חדר ראשון כדי להתחיל!</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Room Power Summary -->
+        <div class="mt-8">
+            <h2 class="text-xl font-bold text-blue-900 mb-4 bg-yellow-300 inline-block px-4 py-1 rounded-lg">לפי חדרים</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {% for room in rooms %}
+                <div class="bg-gradient-to-r from-blue-100 to-green-100 rounded-lg p-4 text-center">
+                    <h3 class="text-lg font-bold text-blue-900">{{ room.name }}</h3>
+                    <div class="mt-2">
+                        {% set total = [0] %}
+                        {% for device in room.devices %}
+                            {% set latest = device.minutely_consumptions|sort(attribute='time')|last %}
+                            {% if latest %}
+                                {% set _ = total.append(total.pop() + latest.power_consumption) %}
+                            {% endif %}
+                        {% endfor %}
+                        <span class="text-2xl font-bold text-blue-900">{{ "%.1f"|format(total[0]) }}W</span>
+                    </div>
+                </div>
                 {% endfor %}
             </div>
         </div>
-        {% else %}
-        <div class="col-span-full text-center py-12">
-            <p class="text-gray-500">No rooms yet. Add your first room to get started!</p>
-        </div>
-        {% endfor %}
     </div>
 </div>
 
 <!-- Add Room Modal -->
-<div id="addRoomModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full">
-    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+<div id="addRoomModal" class="fixed inset-0 bg-blue-900/50 hidden overflow-y-auto h-full w-full" dir="rtl">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-lg bg-gradient-to-r from-yellow-50 to-yellow-100">
         <div class="mt-3">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Add New Room</h3>
+            <h3 class="text-xl font-bold text-blue-900 mb-4">הוסף חדר חדש</h3>
             <form id="addRoomForm" class="space-y-4">
                 <input type="hidden" name="profile_id" value="{{ profile.profile_id }}">
                 <div>
-                    <label for="roomName" class="block text-sm font-medium text-gray-700">Room Name</label>
+                    <label for="roomName" class="block text-sm font-medium text-blue-900">שם החדר</label>
                     <input type="text" id="roomName" name="name" required
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary">
+                           class="mt-1 block w-full rounded-lg border-blue-200 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white">
                 </div>
                 <div class="flex justify-end space-x-3">
                     <button type="button" onclick="hideAddRoomModal()"
-                            class="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">
-                        Cancel
+                            class="px-4 py-2 text-blue-900 bg-blue-100 rounded-lg hover:bg-blue-200">
+                        ביטול
                     </button>
                     <button type="submit"
-                            class="px-4 py-2 text-white bg-primary rounded-md hover:bg-secondary">
-                        Create Room
+                            class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+                        צור חדר
                     </button>
                 </div>
             </form>
@@ -87,40 +143,40 @@
 </div>
 
 <!-- Add Device Modal -->
-<div id="addDeviceModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full">
-    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+<div id="addDeviceModal" class="fixed inset-0 bg-blue-900/50 hidden overflow-y-auto h-full w-full" dir="rtl">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-lg bg-gradient-to-r from-yellow-50 to-yellow-100">
         <div class="mt-3">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Add New Device</h3>
+            <h3 class="text-xl font-bold text-blue-900 mb-4">הוסף מכשיר חדש</h3>
             <form id="addDeviceForm" class="space-y-4">
                 <input type="hidden" id="deviceRoomId" name="room_id">
                 <div>
-                    <label for="deviceName" class="block text-sm font-medium text-gray-700">Device Name</label>
+                    <label for="deviceName" class="block text-sm font-medium text-blue-900">שם המכשיר</label>
                     <input type="text" id="deviceName" name="name" required
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary">
+                           class="mt-1 block w-full rounded-lg border-blue-200 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white">
                 </div>
                 <div>
-                    <label for="deviceUrl" class="block text-sm font-medium text-gray-700">Device URL</label>
+                    <label for="deviceUrl" class="block text-sm font-medium text-blue-900">כתובת המכשיר</label>
                     <input type="text" id="deviceUrl" name="device_url" required
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary">
+                           class="mt-1 block w-full rounded-lg border-blue-200 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white">
                 </div>
                 <div>
-                    <label for="deviceType" class="block text-sm font-medium text-gray-700">Device Type</label>
+                    <label for="deviceType" class="block text-sm font-medium text-blue-900">סוג המכשיר</label>
                     <select id="deviceType" name="type" required
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary">
-                        <option value="TV">TV</option>
-                        <option value="AC">AC</option>
-                        <option value="PC">PC</option>
-                        <option value="Fridge">Fridge</option>
+                            class="mt-1 block w-full rounded-lg border-blue-200 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white">
+                        <option value="TV">טלוויזיה</option>
+                        <option value="AC">מזגן</option>
+                        <option value="PC">מחשב</option>
+                        <option value="Fridge">מקרר</option>
                     </select>
                 </div>
                 <div class="flex justify-end space-x-3">
                     <button type="button" onclick="hideAddDeviceModal()"
-                            class="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">
-                        Cancel
+                            class="px-4 py-2 text-blue-900 bg-blue-100 rounded-lg hover:bg-blue-200">
+                        ביטול
                     </button>
                     <button type="submit"
-                            class="px-4 py-2 text-white bg-primary rounded-md hover:bg-secondary">
-                        Add Device
+                            class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+                        הוסף מכשיר
                     </button>
                 </div>
             </form>
@@ -148,15 +204,38 @@ function hideAddDeviceModal() {
     document.getElementById('addDeviceModal').classList.add('hidden');
 }
 
-function updateDevicePower(deviceId) {
-    const powerElement = document.querySelector(`[data-device-id="${deviceId}"]`);
-    if (!powerElement) return;
+function updateAllDevicePowers() {
+    const devices = $('.device-card');
+    let index = 0;
 
-    $.get(`/api/device/${deviceId}/power`, function(response) {
-        powerElement.innerHTML = `${response.power.toFixed(1)} W`;
-    }).fail(function() {
-        powerElement.innerHTML = 'Error';
-    });
+    function updateNext() {
+        if (index >= devices.length) return;
+        
+        const deviceId = $(devices[index]).find('.power-value').data('device-id');
+        $.get(`/api/device/${deviceId}/power`)
+            .done(function(response) {
+                const powerElement = $(devices[index]).find('.power-value');
+                let powerHtml = `${response.power.toFixed(1)} W`;
+                if (response.weekly_average !== null) {
+                    powerHtml += `<br><span class="text-xs text-blue-700">ממוצע: ${response.weekly_average.toFixed(1)} W</span>`;
+                }
+                if (response.last_updated) {
+                    const lastUpdate = new Date(response.last_updated);
+                    powerHtml += `<br><span class="text-xs text-blue-600">עודכן: ${lastUpdate.toLocaleTimeString()}</span>`;
+                }
+                powerElement.html(powerHtml);
+            })
+            .fail(function() {
+                const powerElement = $(devices[index]).find('.power-value');
+                powerElement.html('שגיאה');
+            })
+            .always(function() {
+                index++;
+                setTimeout(updateNext, 1000);
+            });
+    }
+
+    updateNext();
 }
 
 $(document).ready(function() {
@@ -200,18 +279,37 @@ $(document).ready(function() {
         });
     });
 
-    // Update power values every 30 seconds
-    $('.device-card').each(function() {
-        const deviceId = $(this).find('.power-value').data('device-id');
-        updateDevicePower(deviceId);
-    });
-
-    setInterval(function() {
-        $('.device-card').each(function() {
-            const deviceId = $(this).find('.power-value').data('device-id');
-            updateDevicePower(deviceId);
-        });
-    }, 30000);
+    // Initial power update
+    updateAllDevicePowers();
+    
+    // Update every 5 minutes
+    setInterval(updateAllDevicePowers, 300000);
 });
 </script>
+{% endblock %}
+
+{% block styles %}
+<style>
+:root {
+    --primary-color: #2563eb;
+    --secondary-color: #1e40af;
+    --background-color: #fefce8;
+}
+
+body {
+    background-color: var(--background-color);
+}
+
+.bg-yellow-300 {
+    background-color: #fde047;
+}
+
+.device-card {
+    transition: all 0.3s ease;
+}
+
+.device-card:hover {
+    transform: translateY(-2px);
+}
+</style>
 {% endblock %} 

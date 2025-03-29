@@ -15,10 +15,8 @@ from sqlalchemy.dialects.mysql import ENUM
 
 # Database Setup
 engine = create_engine(
-    "mysql+mysqlconnector://Yohad:159357@localhost/Intelergy", echo=True
+    "mysql+mysqlconnector://root:MyNewPass@localhost/Intelergy", echo=True
 )
-Session = sessionmaker(bind=engine)
-session = Session()
 
 Base = declarative_base()
 
@@ -52,6 +50,19 @@ class Room(BaseModel):
     name = Column(String(50), nullable=False)
 
     devices = relationship("Device", backref="room")
+
+    @property
+    def total_power(self):
+        total = 0
+        for device in self.devices:
+            latest_consumption = (
+                device.minutely_consumptions
+                .order_by(MinutelyConsumption.time.desc())
+                .first()
+            )
+            if latest_consumption:
+                total += float(latest_consumption.power_consumption)
+        return total
 
 
 # Many-to-Many association for HistoricalHourlyConsumption with those Devices

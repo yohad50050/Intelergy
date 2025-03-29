@@ -4,7 +4,37 @@
 
 {% block content %}
 <div class="min-h-screen" dir="rtl">
-    <!-- Header -->
+    <!-- New Description Section -->
+    <div class="max-w-7xl mx-auto mb-8">
+        <div class="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-8 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <h1 class="text-3xl font-bold text-blue-900">שלום, {{ profile.name }}</h1>
+                <div class="flex items-center">
+                    <i class="fas fa-leaf text-green-500 text-3xl ml-2"></i>
+                    <span class="text-xl font-medium text-green-600">intelergy</span>
+                </div>
+            </div>
+            <p class="text-lg text-gray-600 mb-2">
+                ברוכים הבאים למערכת החכמה לניהול צריכת החשמל בבית שלך
+            </p>
+            <div class="flex flex-wrap gap-4 mt-4">
+                <div class="bg-green-100 rounded-lg p-3 flex items-center">
+                    <i class="fas fa-bolt text-green-600 mr-2"></i>
+                    <span class="text-green-800">מעקב צריכת חשמל בזמן אמת</span>
+                </div>
+                <div class="bg-green-100 rounded-lg p-3 flex items-center">
+                    <i class="fas fa-home text-green-600 mr-2"></i>
+                    <span class="text-green-800">ניהול חדרים ומכשירים</span>
+                </div>
+                <div class="bg-green-100 rounded-lg p-3 flex items-center">
+                    <i class="fas fa-chart-line text-green-600 mr-2"></i>
+                    <span class="text-green-800">ניתוח וחיסכון בחשמל</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Existing Content -->
     <div class="max-w-7xl mx-auto">
         <div class="flex justify-between items-center mb-6">
             <h1 class="text-2xl font-bold text-blue-900">{{ profile.name }}</h1>

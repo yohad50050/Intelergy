@@ -28,11 +28,23 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_NAME = os.getenv("DB_NAME", "intelergy")
 
-# Create database URL with properly escaped password
-DATABASE_URL = f"mysql+mysqlconnector://{DB_USERNAME}:{quote_plus(DB_PASSWORD)}@{DB_HOST}/{DB_NAME}"
+# Create database URL with properly escaped password and additional parameters
+DATABASE_URL = (
+    f"mysql+mysqlconnector://{DB_USERNAME}:{quote_plus(DB_PASSWORD)}@{DB_HOST}/{DB_NAME}"
+    "?auth_plugin=mysql_native_password"
+    "&charset=utf8mb4"
+)
 
-# Create engine and session
-engine = create_engine(DATABASE_URL, echo=True)  # Set echo=True to see SQL output
+# Create engine and session with specific configuration
+engine = create_engine(
+    DATABASE_URL,
+    echo=True,  # Set to False in production
+    pool_recycle=3600,
+    pool_pre_ping=True,
+    connect_args={
+        "auth_plugin": "mysql_native_password",
+    },
+)
 Session = sessionmaker(bind=engine)
 session = Session()
 

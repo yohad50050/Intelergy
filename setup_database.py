@@ -15,9 +15,13 @@ def setup_database():
     DB_NAME = os.getenv("DB_NAME", "intelergy")
 
     try:
-        # First try to connect to MySQL server
+        # First try to connect to MySQL server with additional parameters
         connection = mysql.connector.connect(
-            host=DB_HOST, user=DB_USERNAME, password=DB_PASSWORD
+            host=DB_HOST,
+            user=DB_USERNAME,
+            password=DB_PASSWORD,
+            auth_plugin="mysql_native_password",
+            charset="utf8mb4",
         )
 
         if connection.is_connected():
@@ -30,11 +34,13 @@ def setup_database():
             # Use the database
             cursor.execute(f"USE {DB_NAME}")
 
-            # Grant privileges
-            grant_query = f"GRANT ALL PRIVILEGES ON {DB_NAME}.* TO '{DB_USERNAME}'@'localhost' IDENTIFIED BY '{DB_PASSWORD}'"
-            cursor.execute(grant_query)
+            # Update authentication method for root user
+            cursor.execute(
+                "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY %s",
+                (DB_PASSWORD,),
+            )
             cursor.execute("FLUSH PRIVILEGES")
-            print(f"Privileges granted to user '{DB_USERNAME}'")
+            print("Root user authentication updated.")
 
             return True
 

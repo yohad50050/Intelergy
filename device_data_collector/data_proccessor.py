@@ -1,199 +1,104 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from collections import deque
-from .models import (
+
+# CHANGED THESE IMPORTS:
+from device_data_collector.models import (
     Device,
     MinutelyConsumption,
     HistoricalHourlyConsumption,
     DeviceDailyConsumption,
     DeviceWeeklyConsumption,
 )
-from .db import db
+from device_data_collector.db import db
 
 
 def aggregate_hourly():
-
-    ## For each device:
-    ##   1. Gather non-zero minutely logs in ascending time order.
-    ##   2. Whenever we have 60 logs, create an hourly record.
-    ##   3. Remove those 60 logs from the DB.
-    ##   4. Also remove zero-power logs each time (so they don't pile up).
-
-    print("[aggregate_hourly] Starting...")
     db.session.expire_all()
-
-    all_devices = db.session.query(Device).all()
-    for device in all_devices:
-        print(
-            f"  Checking device {device.device_id} ({device.name}) for hourly aggregation..."
-        )
-        nonzero_logs = (
+    devices = db.session.query(Device).all()
+    for d in devices:
+        logs = (
             db.session.query(MinutelyConsumption)
-            .filter(MinutelyConsumption.device_id == device.device_id)
+            .filter_by(device_id=d.device_id)
             .filter(MinutelyConsumption.power_consumption > 0)
             .order_by(MinutelyConsumption.time.asc())
             .all()
         )
-
-        logs_queue = deque(nonzero_logs)
-        while len(logs_queue) >= 60:
-
-            sixty_logs = []
-            for i in range(60):
-                popped_log = logs_queue.popleft()
-                sixty_logs.append(popped_log)
-
-            total_power = 0
-            for log in sixty_logs:
-                total_power += log.power_consumption
-            average_power = float(total_power) / 60.0
-            start_time = sixty_logs[0].time.replace(second=0, microsecond=0)
-
-            new_hourly_record = HistoricalHourlyConsumption(
-                start_time=start_time, average_historical_power=average_power
+        q = deque(logs)
+        while len(q) >= 60:
+            block = [q.popleft() for _ in range(60)]
+            avg = sum(x.power_consumption for x in block) / 60
+            start = block[0].time.replace(second=0, microsecond=0)
+            h = HistoricalHourlyConsumption(
+                device_id=d.device_id, start_time=start, average_historical_power=avg
             )
-            new_hourly_record.devices.append(device)
-            db.session.add(new_hourly_record)
-
-            # Remove 60 non-zero from DB
-            for used_log in sixty_logs:
-                db.session.delete(used_log)
-
-            # Remove zero from DB
-            zero_logs = (
+            db.session.add(h)
+            for used in block:
+                db.session.delete(used)
+            zeros = (
                 db.session.query(MinutelyConsumption)
-                .filter(MinutelyConsumption.power_consumption == 0)
+                .filter_by(power_consumption=0)
                 .all()
             )
-            for zero_log in zero_logs:
-                db.session.delete(zero_log)
-
+            for z in zeros:
+                db.session.delete(z)
             db.session.commit()
-            print(
-                f"    + Hourly record created ({average_power:.2f} W), removed 60 logs plus zero logs if any."
-            )
-
-    print("[aggregate_hourly] Done.\n")
 
 
 def aggregate_daily():
-
-    ## For each device:
-    ##   1. Gather hourly logs from DB in ascending order.
-    ##   2. Whenever we have 24 logs, create a daily record and remove them.
-
-    print("[aggregate_daily] Starting...")
     db.session.expire_all()
-
-    all_devices = db.session.query(Device).all()
-    for device in all_devices:
-        print(
-            f"  Checking device {device.device_id} ({device.name}) for daily aggregation..."
-        )
-        hourly_rows = (
+    devices = db.session.query(Device).all()
+    for d in devices:
+        rows = (
             db.session.query(HistoricalHourlyConsumption)
-            .join(HistoricalHourlyConsumption.devices)
-            .filter(Device.device_id == device.device_id)
+            .filter_by(device_id=d.device_id)
             .order_by(HistoricalHourlyConsumption.start_time.asc())
             .all()
         )
-
-        row_queue = deque(hourly_rows)
-        while len(row_queue) >= 24:
-            twenty_four_hours = []
-            for i in range(24):
-                popped_row = row_queue.popleft()
-                twenty_four_hours.append(popped_row)
-
-            total_power = 0
-            for h in twenty_four_hours:
-                total_power += h.average_historical_power
-            daily_average = float(total_power) / 24.0
-            day_date = twenty_four_hours[0].start_time.date()
-
-            new_daily_record = DeviceDailyConsumption(
-                daily_average=daily_average,
+        q = deque(rows)
+        while len(q) >= 24:
+            block = [q.popleft() for _ in range(24)]
+            avg = sum(x.average_historical_power for x in block) / 24
+            day_date = block[0].start_time.date()
+            daily = DeviceDailyConsumption(
+                device_id=d.device_id,
+                daily_average=avg,
                 date=day_date,
-                device_id=device.device_id,
                 status="regular",
             )
-            db.session.add(new_daily_record)
-
-            for hourly_row in twenty_four_hours:
-                db.session.delete(hourly_row)
-
+            db.session.add(daily)
+            for used in block:
+                db.session.delete(used)
             db.session.commit()
-            print(
-                f"    + Daily record created for {day_date}, avg={daily_average:.2f}, removed 24 hourly rows."
-            )
-
-    print("[aggregate_daily] Done.\n")
 
 
 def aggregate_weekly():
-
-    ## For each device:
-    ##   1. Gather daily logs in ascending date order.
-    ##   2. Whenever we have 7, create a weekly record and remove them.
-
-    print("[aggregate_weekly] Starting...")
     db.session.expire_all()
-
-    all_devices = db.session.query(Device).all()
-    for device in all_devices:
-        print(
-            f"  Checking device {device.device_id} ({device.name}) for weekly aggregation..."
-        )
-        daily_rows = (
+    devices = db.session.query(Device).all()
+    for d in devices:
+        rows = (
             db.session.query(DeviceDailyConsumption)
-            .filter(DeviceDailyConsumption.device_id == device.device_id)
+            .filter_by(device_id=d.device_id)
             .order_by(DeviceDailyConsumption.date.asc())
             .all()
         )
-
-        row_queue = deque(daily_rows)
-        while len(row_queue) >= 7:
-            seven_days = []
-            for i in range(7):
-                popped_day = row_queue.popleft()
-                seven_days.append(popped_day)
-
-            total_daily = 0
-            for day in seven_days:
-                total_daily += day.daily_average
-            weekly_average = total_daily / 7.0
-            week_start = seven_days[0].date
-
-            new_weekly_record = DeviceWeeklyConsumption(
-                weekly_average=weekly_average,
-                date=week_start,
-                device_id=device.device_id,
-                status="regular",
+        q = deque(rows)
+        while len(q) >= 7:
+            block = [q.popleft() for _ in range(7)]
+            avg = sum(x.daily_average for x in block) / 7
+            wstart = block[0].date
+            weekly = DeviceWeeklyConsumption(
+                device_id=d.device_id, weekly_average=avg, date=wstart, status="regular"
             )
-            db.session.add(new_weekly_record)
-
-            for day_record in seven_days:
-                db.session.delete(day_record)
-
+            db.session.add(weekly)
+            for used in block:
+                db.session.delete(used)
             db.session.commit()
-            print(
-                f"    + Weekly record created starting {week_start}, avg={weekly_average:.2f}, removed 7 daily rows."
-            )
-
-    print("[aggregate_weekly] Done.\n")
 
 
 def data_processor():
-
-    ## Runs the entire pipeline:
-    ##   1) Hourly aggregation (60 minutely => 1 hour)
-    ##   2) Daily aggregation (24 hours => 1 day)
-    ##   3) Weekly aggregation (7 days => 1 week)
-
-    print("[data_processor] Starting aggregation pipeline.")
     aggregate_hourly()
     aggregate_daily()
     aggregate_weekly()
-    print("[data_processor] Aggregation complete.\n")
 
 
 if __name__ == "__main__":

@@ -1,8 +1,15 @@
 import time
 import requests
 from datetime import datetime, timezone
-from models import session, Profile, User, Room, Device, MinutelyConsumption
-from data_proccessor import data_processor
+from .models import (
+    Profile,
+    User,
+    Room,
+    Device,
+    MinutelyConsumption,
+)
+from .db import db
+from .data_proccessor import data_processor
 
 
 def fetch_shelly_power(device_url):
@@ -36,15 +43,15 @@ def create_new_profile():
     ## Create a new Profile.
     ## If no User exists, create a new User first.
 
-    existing_users = session.query(User).all()
+    existing_users = db.session.query(User).all()
     if not existing_users:
         print("No users found. Let's create one first.")
         user_name = input("Enter user name: ")
         user_email = input("Enter user email: ")
         user_password = input("Enter user password: ")
         new_user = User(user_name=user_name, email=user_email, password=user_password)
-        session.add(new_user)
-        session.commit()
+        db.session.add(new_user)
+        db.session.commit()
         print(f"Created a new user named {user_name}")
         existing_users = [new_user]
 
@@ -54,14 +61,14 @@ def create_new_profile():
     user_choice = input("Enter user ID or press Enter to pick the first: ").strip()
     chosen_user = None
     if user_choice:
-        chosen_user = session.query(User).filter_by(user_id=user_choice).first()
+        chosen_user = db.session.query(User).filter_by(user_id=user_choice).first()
     if not chosen_user:
         chosen_user = existing_users[0]
 
     profile_name = input("Enter profile name: ")
     new_profile = Profile(name=profile_name, user_id=chosen_user.user_id)
-    session.add(new_profile)
-    session.commit()
+    db.session.add(new_profile)
+    db.session.commit()
     print(f"Created new profile '{profile_name}' for user '{chosen_user.user_name}'")
 
 
@@ -70,7 +77,7 @@ def create_new_room():
     ## Create a new Room within an existing Profile.
     ## If no Profile exists, create one first.
 
-    existing_profiles = session.query(Profile).all()
+    existing_profiles = db.session.query(Profile).all()
     if not existing_profiles:
         print("No profiles found. Please create a profile first.")
         return
@@ -82,15 +89,15 @@ def create_new_room():
     chosen_profile = None
     if profile_choice:
         chosen_profile = (
-            session.query(Profile).filter_by(profile_id=profile_choice).first()
+            db.session.query(Profile).filter_by(profile_id=profile_choice).first()
         )
     if not chosen_profile:
         chosen_profile = existing_profiles[0]
 
     room_name = input("Enter room name: ")
     new_room = Room(name=room_name, profile_id=chosen_profile.profile_id)
-    session.add(new_room)
-    session.commit()
+    db.session.add(new_room)
+    db.session.commit()
     print(f"Created new room '{room_name}' under profile '{chosen_profile.name}'")
 
 
@@ -110,7 +117,7 @@ def create_new_device():
     device_url = input("Enter device URL (e.g. 'http://192.168.1.10'): ").strip()
 
     # Check if device already exists
-    existing_device = session.query(Device).filter_by(device_url=device_url).first()
+    existing_device = db.session.query(Device).filter_by(device_url=device_url).first()
     if existing_device:
         print("A device with that URL already exists. Aborting.")
         return
@@ -124,11 +131,11 @@ def create_new_device():
     device_type = input("Enter device type (e.g. TV/AC/Fridge): ").capitalize()
 
     # Choose profile
-    profiles = session.query(Profile).all()
+    profiles = db.session.query(Profile).all()
     if not profiles:
         print("No profiles exist. Creating a new profile first.")
         create_new_profile()
-        profiles = session.query(Profile).all()
+        profiles = db.session.query(Profile).all()
         if not profiles:
             print("Still no profiles, aborting device creation.")
             return
@@ -142,7 +149,7 @@ def create_new_device():
     chosen_profile = None
     if profile_choice:
         chosen_profile = (
-            session.query(Profile).filter_by(profile_id=profile_choice).first()
+            db.session.query(Profile).filter_by(profile_id=profile_choice).first()
         )
     if not chosen_profile:
         chosen_profile = profiles[0]
@@ -154,8 +161,8 @@ def create_new_device():
         )
         room_name = input("Enter room name: ")
         new_room = Room(name=room_name, profile_id=chosen_profile.profile_id)
-        session.add(new_room)
-        session.commit()
+        db.session.add(new_room)
+        db.session.commit()
         chosen_room = new_room
     else:
         print(f"Choose a room in profile '{chosen_profile.name}':")
@@ -164,7 +171,7 @@ def create_new_device():
         room_choice = input("Enter room ID or press Enter to pick the first: ").strip()
         chosen_room = None
         if room_choice:
-            chosen_room = session.query(Room).filter_by(room_id=room_choice).first()
+            chosen_room = db.session.query(Room).filter_by(room_id=room_choice).first()
         if not chosen_room:
             chosen_room = chosen_profile.rooms[0]
 
@@ -175,8 +182,8 @@ def create_new_device():
         type=device_type,
         room_id=chosen_room.room_id,
     )
-    session.add(new_device)
-    session.commit()
+    db.session.add(new_device)
+    db.session.commit()
 
     print(
         f"Created new device '{device_name}' (URL: {device_url}) under profile '{chosen_profile.name}', room '{chosen_room.name}'"
@@ -227,7 +234,7 @@ def run_data_collector():
         current_minute = datetime.now(timezone.utc).replace(second=0, microsecond=0)
         if current_minute > last_minute_logged:
             print(f"\n[Collector] Minute changed to {current_minute} (UTC)")
-            devices_list = session.query(Device).all()
+            devices_list = db.session.query(Device).all()
             for device in devices_list:
                 if device.status == "ON":
                     power_value = fetch_shelly_power(device.device_url)
@@ -237,12 +244,12 @@ def run_data_collector():
                             power_consumption=power_value,
                             time=current_minute,
                         )
-                        session.add(log_entry)
+                        db.session.add(log_entry)
                         print(
                             f"  => Logged {power_value}W for device '{device.name}' (ID: {device.device_id})"
                         )
 
-            session.commit()
+            db.session.commit()
             data_processor()
             last_minute_logged = current_minute
         else:

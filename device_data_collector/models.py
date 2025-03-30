@@ -10,6 +10,8 @@ from sqlalchemy import (
     Enum,
 )
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.mysql import ENUM
+from datetime import datetime
 
 from device_data_collector.db import Base, session
 
@@ -21,6 +23,7 @@ class User(Base):
     user_name = Column(String(50), nullable=False)
     email = Column(String(100), unique=True, nullable=False)
     password = Column(String(100), nullable=False)
+    created_at = Column(DateTime, default=func.now())
 
     profiles = relationship(
         "Profile", back_populates="user", cascade="all, delete-orphan"
@@ -29,12 +32,14 @@ class User(Base):
 
 class Profile(Base):
     __tablename__ = "profiles"
+    __table_args__ = {"mysql_engine": "InnoDB", "mysql_charset": "utf8mb4"}
 
     profile_id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(50), nullable=False)
     user_id = Column(
         Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
     )
+    created_at = Column(DateTime, default=func.now())
 
     user = relationship("User", back_populates="profiles")
     rooms = relationship("Room", back_populates="profile", cascade="all, delete-orphan")
@@ -71,6 +76,9 @@ class Device(Base):
     minutely_consumptions = relationship(
         "MinutelyConsumption", back_populates="device", cascade="all, delete-orphan"
     )
+    hourly_consumptions = relationship(
+        "HourlyConsumption", back_populates="device", cascade="all, delete-orphan"
+    )
     weekly_consumptions = relationship(
         "DeviceWeeklyConsumption", back_populates="device", cascade="all, delete-orphan"
     )
@@ -95,6 +103,19 @@ class MinutelyConsumption(Base):
     time = Column(DateTime, nullable=False)
 
     device = relationship("Device", back_populates="minutely_consumptions")
+
+
+class HourlyConsumption(Base):
+    __tablename__ = "hourly_consumptions"
+
+    consumption_id = Column(Integer, primary_key=True, autoincrement=True)
+    device_id = Column(
+        Integer, ForeignKey("devices.device_id", ondelete="CASCADE"), nullable=False
+    )
+    power_consumption = Column(Float, nullable=False)
+    time = Column(DateTime, nullable=False)
+
+    device = relationship("Device", back_populates="hourly_consumptions")
 
 
 class HistoricalHourlyConsumption(Base):
@@ -135,3 +156,6 @@ class DeviceWeeklyConsumption(Base):
     date = Column(DateTime, nullable=False)
 
     device = relationship("Device", back_populates="weekly_consumptions")
+
+
+# Base.metadata.drop_all(bind=session.get_bind())

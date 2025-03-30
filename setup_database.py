@@ -2,6 +2,8 @@ import mysql.connector
 from mysql.connector import Error
 import os
 from dotenv import load_dotenv
+from device_data_collector.db import db
+from device_data_collector.models import Base
 
 # Load environment variables
 load_dotenv()
@@ -27,41 +29,46 @@ def setup_database():
         if connection.is_connected():
             cursor = connection.cursor()
 
-            # Create database if it doesn't exist
-            cursor.execute(f"CREATE DATABASE IF NOT EXISTS {DB_NAME}")
-            print(f"Database '{DB_NAME}' created or already exists.")
+            # Drop the database if it exists
+            cursor.execute(f"DROP DATABASE IF EXISTS {DB_NAME}")
+            print(f"Database '{DB_NAME}' dropped if it existed.")
 
-            # Use the database
-            cursor.execute(f"USE {DB_NAME}")
-
-            # Update authentication method for root user
+            # Create database with proper character set
             cursor.execute(
-                "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY %s",
-                (DB_PASSWORD,),
+                f"CREATE DATABASE {DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
             )
-            cursor.execute("FLUSH PRIVILEGES")
-            print("Root user authentication updated.")
+            print(f"Database '{DB_NAME}' created successfully.")
+
+            # Select the database
+            cursor.execute(f"USE {DB_NAME}")
+            print(f"Using database '{DB_NAME}'")
+
+            # Close MySQL connection before SQLAlchemy operations
+            cursor.close()
+            connection.close()
+            print("MySQL connection closed.")
+
+            # Create tables using SQLAlchemy
+            print("\nCreating database tables...")
+
+            # Create all tables
+            Base.metadata.create_all(db.engine)
+            print("Database tables created successfully!")
 
             return True
 
     except Error as e:
         print(f"Error: {e}")
         return False
-
-    finally:
-        if "connection" in locals() and connection.is_connected():
-            cursor.close()
-            connection.close()
-            print("MySQL connection closed.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return False
 
 
 if __name__ == "__main__":
     if setup_database():
-        print("Database setup completed successfully!")
-        print("\nNow you can run:")
-        print("1. python -m device_data_collector.models")
-        print("2. python create_test_user.py")
+        print("\nSetup completed successfully!")
+        print("\nYou can now run:")
+        print("python main_web_app.py")
     else:
-        print(
-            "Database setup failed. Please check your MySQL credentials and permissions."
-        )
+        print("Setup failed. Please check your MySQL credentials and permissions.")

@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: device_data_collector
+Version: 0.1
+Requires-Dist: sqlalchemy
+Requires-Dist: mysql-connector-python
+Requires-Dist: python-dotenv
+Requires-Dist: requests
+Requires-Dist: flask
+Requires-Dist: flask-login
+Dynamic: requires-dist

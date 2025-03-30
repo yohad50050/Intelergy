@@ -39,54 +39,107 @@
         <div class="flex justify-between items-center mb-6">
             <h1 class="text-2xl font-bold text-blue-900">{{ profile.name }}</h1>
             <div class="space-x-4">
-                <button onclick="showAddRoomModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                    <i class="fas fa-plus mr-2"></i>הוסף חדר
-                </button>
                 <a href="{{ url_for('index') }}" class="text-blue-900 hover:text-blue-700">
                     <i class="fas fa-arrow-right mr-2"></i>חזרה לפרופילים
                 </a>
             </div>
         </div>
 
-        <!-- Rooms Grid -->
+        <!-- Add Room Form -->
+        <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <h2 class="text-xl font-bold text-blue-900 mb-4">הוסף חדר חדש</h2>
+            <form action="{{ url_for('add_room') }}" method="POST" class="flex gap-4">
+                <input type="hidden" name="profile_id" value="{{ profile.profile_id }}">
+                <input type="text" name="name" required placeholder="שם החדר"
+                    class="flex-1 rounded-lg border-blue-200 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                    הוסף חדר
+                </button>
+            </form>
+        </div>
+
+        <!-- Rooms List -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {% for room in rooms %}
-            <div class="bg-gradient-to-br from-blue-100 to-green-100 rounded-lg shadow p-6">
+            <div class="bg-gradient-to-br from-blue-50 to-green-50 rounded-lg shadow p-6">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-semibold text-blue-900">{{ room.name }}</h2>
-                    <button onclick="showAddDeviceModal('{{ room.room_id }}')" 
-                            class="text-blue-600 hover:text-blue-700">
+                    <button onclick="showAddDeviceForm('{{ room.room_id }}')" 
+                            class="text-blue-600 hover:text-blue-700 bg-blue-100 hover:bg-blue-200 p-2 rounded-full transition-colors">
                         <i class="fas fa-plus"></i>
                     </button>
                 </div>
+
+                <!-- Add Device Form (Hidden by default) -->
+                <div id="deviceForm{{ room.room_id }}" class="mb-4 p-4 bg-white rounded-lg shadow-sm hidden">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-lg font-semibold text-blue-900">הוסף מכשיר חדש</h3>
+                        <button onclick="hideAddDeviceForm('{{ room.room_id }}')" class="text-blue-600 hover:text-blue-800">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <form action="{{ url_for('add_device') }}" method="POST" class="space-y-3">
+                        <input type="hidden" name="room_id" value="{{ room.room_id }}">
+                        
+                        <div>
+                            <select name="type" required class="w-full rounded-lg border-blue-200 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <option value="">בחר סוג מכשיר</option>
+                                <option value="TV">טלוויזיה</option>
+                                <option value="AC">מזגן</option>
+                                <option value="PC">מחשב</option>
+                                <option value="Fridge">מקרר</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <input type="text" name="name" required placeholder="שם המכשיר"
+                                class="w-full rounded-lg border-blue-200 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+
+                        <div>
+                            <input type="text" name="device_url" required placeholder="http://192.168.1.xxx"
+                                class="w-full rounded-lg border-blue-200 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+
+                        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+                            הוסף מכשיר
+                        </button>
+                    </form>
+                </div>
                 
-                <div class="space-y-4">
+                {% if room.devices %}
+                <div class="space-y-3">
                     {% for device in room.devices %}
-                    <div class="device-card bg-white p-4 rounded-lg shadow-sm {% if device.status == 'OFF' %}opacity-50{% endif %}">
+                    <div class="bg-white p-3 rounded-lg shadow-sm">
                         <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-3">
-                                <i class="fas fa-{{ device.type | get_device_icon }} text-2xl text-blue-600"></i>
+                            <div class="flex items-center">
+                                <i class="fas fa-{{ device.type | get_device_icon }} text-blue-600 text-xl mr-3"></i>
                                 <div>
-                                    <h3 class="font-medium text-blue-900">{{ device.name }}</h3>
-                                    <p class="text-sm text-blue-700">{{ device.type }}</p>
+                                    <div class="font-medium text-blue-900">{{ device.name }}</div>
+                                    <div class="text-sm text-blue-600">{{ device.type }}</div>
                                 </div>
                             </div>
-                            <div class="text-right">
-                                <div class="text-sm font-medium text-blue-900 power-value" data-device-id="{{ device.device_id }}">
-                                    <span class="loading">טוען...</span>
+                            <div class="flex items-center gap-3">
+                                <div class="power-value text-right" data-device-id="{{ device.device_id }}">
+                                    <div class="font-bold text-blue-900">--W</div>
+                                    <div class="text-xs text-blue-600">Loading...</div>
                                 </div>
-                                <div class="text-xs text-blue-700">{{ device.status }}</div>
+                                <form class="ml-2">
+                                    <button type="button" 
+                                            onclick="toggleDevice('{{ device.device_id }}', this)" 
+                                            data-action="{{ 'off' if device.status == 'ON' else 'on' }}"
+                                            class="px-3 py-1 rounded-lg {{ 'bg-green-500 hover:bg-green-600' if device.status == 'ON' else 'bg-red-500 hover:bg-red-600' }} text-white transition-colors">
+                                        {{ device.status }}
+                                    </button>
+                                </form>
                             </div>
                         </div>
                     </div>
-                    {% else %}
-                    <p class="text-blue-700 text-center py-2">אין מכשירים בחדר זה</p>
                     {% endfor %}
                 </div>
-            </div>
-            {% else %}
-            <div class="col-span-full text-center py-12">
-                <p class="text-blue-700">אין חדרים עדיין. הוסף חדר ראשון כדי להתחיל!</p>
+                {% else %}
+                <p class="text-blue-700 text-center py-4">No devices in this room</p>
+                {% endif %}
             </div>
             {% endfor %}
         </div>
@@ -114,177 +167,78 @@
         </div>
     </div>
 </div>
-
-<!-- Add Room Modal -->
-<div id="addRoomModal" class="fixed inset-0 bg-blue-900/50 hidden overflow-y-auto h-full w-full" dir="rtl">
-    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-lg bg-gradient-to-r from-yellow-50 to-yellow-100">
-        <div class="mt-3">
-            <h3 class="text-xl font-bold text-blue-900 mb-4">הוסף חדר חדש</h3>
-            <form id="addRoomForm" class="space-y-4">
-                <input type="hidden" name="profile_id" value="{{ profile.profile_id }}">
-                <div>
-                    <label for="roomName" class="block text-sm font-medium text-blue-900">שם החדר</label>
-                    <input type="text" id="roomName" name="name" required
-                           class="mt-1 block w-full rounded-lg border-blue-200 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white">
-                </div>
-                <div class="flex justify-end space-x-3">
-                    <button type="button" onclick="hideAddRoomModal()"
-                            class="px-4 py-2 text-blue-900 bg-blue-100 rounded-lg hover:bg-blue-200">
-                        ביטול
-                    </button>
-                    <button type="submit"
-                            class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700">
-                        צור חדר
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- Add Device Modal -->
-<div id="addDeviceModal" class="fixed inset-0 bg-blue-900/50 hidden overflow-y-auto h-full w-full" dir="rtl">
-    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-lg bg-gradient-to-r from-yellow-50 to-yellow-100">
-        <div class="mt-3">
-            <h3 class="text-xl font-bold text-blue-900 mb-4">הוסף מכשיר חדש</h3>
-            <form id="addDeviceForm" class="space-y-4">
-                <input type="hidden" id="deviceRoomId" name="room_id">
-                <div>
-                    <label for="deviceName" class="block text-sm font-medium text-blue-900">שם המכשיר</label>
-                    <input type="text" id="deviceName" name="name" required
-                           class="mt-1 block w-full rounded-lg border-blue-200 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white">
-                </div>
-                <div>
-                    <label for="deviceUrl" class="block text-sm font-medium text-blue-900">כתובת המכשיר</label>
-                    <input type="text" id="deviceUrl" name="device_url" required
-                           class="mt-1 block w-full rounded-lg border-blue-200 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white">
-                </div>
-                <div>
-                    <label for="deviceType" class="block text-sm font-medium text-blue-900">סוג המכשיר</label>
-                    <select id="deviceType" name="type" required
-                            class="mt-1 block w-full rounded-lg border-blue-200 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white">
-                        <option value="TV">טלוויזיה</option>
-                        <option value="AC">מזגן</option>
-                        <option value="PC">מחשב</option>
-                        <option value="Fridge">מקרר</option>
-                    </select>
-                </div>
-                <div class="flex justify-end space-x-3">
-                    <button type="button" onclick="hideAddDeviceModal()"
-                            class="px-4 py-2 text-blue-900 bg-blue-100 rounded-lg hover:bg-blue-200">
-                        ביטול
-                    </button>
-                    <button type="submit"
-                            class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700">
-                        הוסף מכשיר
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-function showAddRoomModal() {
-    document.getElementById('addRoomModal').classList.remove('hidden');
+function showAddDeviceForm(roomId) {
+    document.getElementById(`deviceForm${roomId}`).classList.remove('hidden');
 }
 
-function hideAddRoomModal() {
-    document.getElementById('addRoomModal').classList.add('hidden');
+function hideAddDeviceForm(roomId) {
+    document.getElementById(`deviceForm${roomId}`).classList.add('hidden');
 }
 
-function showAddDeviceModal(roomId) {
-    document.getElementById('deviceRoomId').value = roomId;
-    document.getElementById('addDeviceModal').classList.remove('hidden');
-}
+function toggleDevice(deviceId, button) {
+    const action = button.dataset.action;
 
-function hideAddDeviceModal() {
-    document.getElementById('addDeviceModal').classList.add('hidden');
-}
-
-function updateAllDevicePowers() {
-    const devices = $('.device-card');
-    let index = 0;
-
-    function updateNext() {
-        if (index >= devices.length) return;
-        
-        const deviceId = $(devices[index]).find('.power-value').data('device-id');
-        $.get(`/api/device/${deviceId}/power`)
-            .done(function(response) {
-                const powerElement = $(devices[index]).find('.power-value');
-                let powerHtml = `${response.power.toFixed(1)} W`;
-                if (response.weekly_average !== null) {
-                    powerHtml += `<br><span class="text-xs text-blue-700">ממוצע: ${response.weekly_average.toFixed(1)} W</span>`;
-                }
-                if (response.last_updated) {
-                    const lastUpdate = new Date(response.last_updated);
-                    powerHtml += `<br><span class="text-xs text-blue-600">עודכן: ${lastUpdate.toLocaleTimeString()}</span>`;
-                }
-                powerElement.html(powerHtml);
-            })
-            .fail(function() {
-                const powerElement = $(devices[index]).find('.power-value');
-                powerElement.html('שגיאה');
-            })
-            .always(function() {
-                index++;
-                setTimeout(updateNext, 1000);
-            });
-    }
-
-    updateNext();
-}
-
-$(document).ready(function() {
-    // Handle room form submission
-    $('#addRoomForm').on('submit', function(e) {
-        e.preventDefault();
-        const formData = new FormData(this);
-        
-        $.ajax({
-            url: '/api/room/add',
-            method: 'POST',
-            data: formData,
-            processData: false,
-            contentType: false,
-            success: function(response) {
-                window.location.reload();
-            },
-            error: function(xhr) {
-                alert('Error creating room: ' + xhr.responseJSON.error);
+    fetch(`/api/device/${deviceId}/toggle`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `action=${action}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update button state
+            const newStatus = action === 'on' ? 'ON' : 'OFF';
+            button.textContent = newStatus;
+            button.dataset.action = newStatus === 'ON' ? 'off' : 'on';
+            
+            // Update button color
+            if (newStatus === 'ON') {
+                button.classList.remove('bg-red-500', 'hover:bg-red-600');
+                button.classList.add('bg-green-500', 'hover:bg-green-600');
+            } else {
+                button.classList.remove('bg-green-500', 'hover:bg-green-600');
+                button.classList.add('bg-red-500', 'hover:bg-red-600');
             }
-        });
+        } else {
+            alert(data.error || 'Failed to toggle device');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to toggle device');
     });
+}
 
-    // Handle device form submission
-    $('#addDeviceForm').on('submit', function(e) {
-        e.preventDefault();
-        const formData = new FormData(this);
-        
-        $.ajax({
-            url: '/api/device/add',
-            method: 'POST',
-            data: formData,
-            processData: false,
-            contentType: false,
-            success: function(response) {
-                window.location.reload();
-            },
-            error: function(xhr) {
-                alert('Error adding device: ' + xhr.responseJSON.error);
-            }
-        });
+// Update power values every 5 seconds
+setInterval(updatePowerValues, 5000);
+function updatePowerValues() {
+    document.querySelectorAll('.power-value').forEach(element => {
+        const deviceId = element.dataset.deviceId;
+        fetch(`/api/device/${deviceId}/power`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.power !== undefined) {
+                    const powerDiv = element.querySelector('.font-bold');
+                    const updateDiv = element.querySelector('.text-xs');
+                    powerDiv.textContent = `${data.power.toFixed(1)}W`;
+                    if (data.last_updated) {
+                        const lastUpdate = new Date(data.last_updated);
+                        updateDiv.textContent = `Last update: ${lastUpdate.toLocaleTimeString()}`;
+                    }
+                }
+            })
+            .catch(error => console.error('Error:', error));
     });
+}
 
-    // Initial power update
-    updateAllDevicePowers();
-    
-    // Update every 5 minutes
-    setInterval(updateAllDevicePowers, 300000);
-});
+// Initial power values update
+updatePowerValues();
 </script>
 {% endblock %}
 
@@ -304,12 +258,16 @@ body {
     background-color: #fde047;
 }
 
-.device-card {
-    transition: all 0.3s ease;
+.transition-colors {
+    transition: all 0.2s ease-in-out;
 }
 
-.device-card:hover {
-    transform: translateY(-2px);
+.power-value {
+    transition: opacity 0.3s ease;
+}
+
+.power-value.updating {
+    opacity: 0.5;
 }
 </style>
 {% endblock %} 

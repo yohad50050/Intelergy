@@ -18,9 +18,24 @@ from device_data_collector.models import (
 from datetime import datetime, timezone
 import requests
 from device_data_collector.db import db
+import re
+import os
 
 app = Flask(__name__)
-app.secret_key = "your-secret-key-here"  # Change this to a secure secret key
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "your-secret-key-here")
+
+# Initialize database tables only if they don't exist
+try:
+    # Check if tables exist by trying to query the users table
+    with db.get_session() as session:
+        session.query(User).first()
+except Exception as e:
+    app.logger.info("Tables don't exist, creating them...")
+    try:
+        db.create_tables()
+        app.logger.info("Database tables created successfully")
+    except Exception as e:
+        app.logger.error(f"Error creating database tables: {e}")
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -53,6 +68,55 @@ def get_device_icon(device_type):
 
 # Register the template filter
 app.jinja_env.filters["get_device_icon"] = get_device_icon
+
+
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    if request.method == "POST":
+        username = request.form.get("username")
+        email = request.form.get("email")
+        password = request.form.get("password")
+        confirm_password = request.form.get("confirm_password")
+
+        # Basic validation
+        if not all([username, email, password, confirm_password]):
+            return render_template("signup.html", error="All fields are required")
+
+        if password != confirm_password:
+            return render_template("signup.html", error="Passwords do not match")
+
+        # Email validation
+        email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+        if not re.match(email_pattern, email):
+            return render_template("signup.html", error="Invalid email format")
+
+        # Check if user already exists
+        with db.get_session() as session:
+            existing_user = session.query(User).filter_by(email=email).first()
+            if existing_user:
+                return render_template("signup.html", error="Email already registered")
+
+            # Create new user
+            try:
+                new_user = User(
+                    user_name=username,
+                    email=email,
+                    password=password,  # In a real app, hash the password!
+                )
+                session.add(new_user)
+                session.commit()
+
+                # Log the user in
+                login_user(UserWrapper(new_user))
+                flash("Account created successfully!")
+                return redirect(url_for("index"))
+            except Exception as e:
+                app.logger.error(f"Error creating user: {str(e)}")
+                return render_template(
+                    "signup.html", error="Error creating account. Please try again."
+                )
+
+    return render_template("signup.html")
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -162,51 +226,90 @@ def add_profile():
 @app.route("/api/room/add", methods=["POST"])
 @login_required
 def add_room():
-    profile_id = request.form.get("profile_id")
-    name = request.form.get("name")
+    try:
+        name = request.form.get("name")
+        profile_id = request.form.get("profile_id")
 
-    if not name or not profile_id:
-        return jsonify({"error": "Name and profile_id are required"}), 400
+        if not name or not profile_id:
+            return jsonify({"error": "Missing room name or profile ID"}), 400
 
-    with db.get_session() as session:
-        profile = (
-            session.query(Profile)
-            .filter_by(profile_id=profile_id, user_id=current_user.id)
-            .first()
-        )
-        if not profile:
-            return jsonify({"error": "Profile not found"}), 404
-        new_room = Room(name=name, profile_id=profile_id)
-        session.add(new_room)
-        session.commit()
-        return jsonify({"success": True, "room_id": new_room.room_id})
+        # Verify the profile belongs to the current user
+        with db.get_session() as session:
+            profile = (
+                session.query(Profile)
+                .filter_by(profile_id=profile_id, user_id=current_user.id)
+                .first()
+            )
+
+            if not profile:
+                return jsonify({"error": "Profile not found"}), 404
+
+            # Create new room
+            new_room = Room(name=name, profile_id=profile_id)
+            session.add(new_room)
+            session.commit()
+
+            # Check if request wants JSON response
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return jsonify({"success": True, "room_id": new_room.room_id})
+            else:
+                # Regular form submission - redirect back to profile page
+                return redirect(url_for("profile_view", profile_id=profile_id))
+
+    except Exception as e:
+        app.logger.error(f"Error creating room: {str(e)}")
+        return jsonify({"error": "Failed to create room"}), 500
 
 
 @app.route("/api/device/add", methods=["POST"])
 @login_required
 def add_device():
-    room_id = request.form.get("room_id")
-    name = request.form.get("name")
-    device_url = request.form.get("device_url")
-    device_type = request.form.get("type")
+    try:
+        room_id = request.form.get("room_id")
+        name = request.form.get("name")
+        device_url = request.form.get("device_url")
+        device_type = request.form.get("type")
 
-    if not all([room_id, name, device_url, device_type]):
-        return jsonify({"error": "All fields are required"}), 400
+        if not all([room_id, name, device_url, device_type]):
+            return jsonify({"error": "All fields are required"}), 400
 
-    with db.get_session() as session:
-        room = session.query(Room).filter_by(room_id=room_id).first()
-        if not room:
-            return jsonify({"error": "Room not found"}), 404
-        new_device = Device(
-            room_id=room_id,
-            name=name,
-            device_url=device_url,
-            type=device_type,
-            status="ON",
-        )
-        session.add(new_device)
-        session.commit()
-        return jsonify({"success": True, "device_id": new_device.device_id})
+        with db.get_session() as session:
+            # First get the room to verify it exists and get its profile_id
+            room = session.query(Room).filter_by(room_id=room_id).first()
+            if not room:
+                return jsonify({"error": "Room not found"}), 404
+
+            # Verify the room belongs to the current user through the profile
+            profile = (
+                session.query(Profile)
+                .filter_by(profile_id=room.profile_id, user_id=current_user.id)
+                .first()
+            )
+
+            if not profile:
+                return jsonify({"error": "Access denied"}), 403
+
+            # Create new device
+            new_device = Device(
+                room_id=room_id,
+                name=name,
+                device_url=device_url,
+                type=device_type,
+                status="ON",
+            )
+            session.add(new_device)
+            session.commit()
+
+            # Check if request wants JSON response
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return jsonify({"success": True, "device_id": new_device.device_id})
+            else:
+                # Regular form submission - redirect back to profile page
+                return redirect(url_for("profile_view", profile_id=room.profile_id))
+
+    except Exception as e:
+        app.logger.error(f"Error adding device: {str(e)}")
+        return jsonify({"error": "Failed to add device"}), 500
 
 
 def fetch_shelly_power(device_url):
@@ -227,6 +330,64 @@ def fetch_shelly_power(device_url):
         return None
     except requests.exceptions.RequestException:
         return None
+
+
+def toggle_shelly_device(device_url, turn_on):
+    try:
+        # Attempt Gen 2 (RPC)
+        response = requests.post(
+            f"{device_url}/rpc/Switch.Set", json={"id": 0, "on": turn_on}, timeout=5
+        )
+        if response.status_code == 200:
+            return True
+
+        # If 404, attempt Gen 1
+        if response.status_code == 404:
+            response = requests.get(
+                f"{device_url}/relay/0?turn={'on' if turn_on else 'off'}", timeout=5
+            )
+            if response.status_code == 200:
+                return True
+
+        return False
+    except requests.exceptions.RequestException:
+        return False
+
+
+@app.route("/api/device/<int:device_id>/toggle", methods=["POST"])
+@login_required
+def toggle_device(device_id):
+    action = request.form.get("action")
+    if action not in ["on", "off"]:
+        return jsonify({"success": False, "error": "Invalid action"}), 400
+
+    with db.get_session() as session:
+        device = session.query(Device).filter_by(device_id=device_id).first()
+        if not device:
+            return jsonify({"success": False, "error": "Device not found"}), 404
+
+        # Verify the device belongs to the current user
+        room = session.query(Room).filter_by(room_id=device.room_id).first()
+        profile = session.query(Profile).filter_by(profile_id=room.profile_id).first()
+        if profile.user_id != current_user.id:
+            return jsonify({"success": False, "error": "Access denied"}), 403
+
+        # Try to toggle the device
+        success = toggle_shelly_device(device.device_url, action == "on")
+        if success:
+            device.status = "ON" if action == "on" else "OFF"
+            session.commit()
+            return jsonify({"success": True, "status": device.status})
+        else:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error": "Failed to toggle device. Please check the device connection.",
+                    }
+                ),
+                500,
+            )
 
 
 if __name__ == "__main__":

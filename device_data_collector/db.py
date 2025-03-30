@@ -47,7 +47,7 @@ class DatabaseHandler:
                 connect_args={"auth_plugin": "mysql_native_password"},
                 echo=False,
             )
-            self.Session = scoped_session(sessionmaker(bind=self.engine))
+            self.Session = sessionmaker(bind=self.engine)
             self._initialized = True
             logger.info("Database connection initialized successfully")
         except Exception as e:
@@ -56,16 +56,15 @@ class DatabaseHandler:
 
     @contextmanager
     def get_session(self):
-        s = self.Session()
+        session = self.Session()
         try:
-            yield s
-            s.commit()
+            yield session
+            session.commit()
         except:
-            s.rollback()
+            session.rollback()
             raise
         finally:
-            s.close()
-            self.Session.remove()
+            session.close()
 
     def create_tables(self):
         try:

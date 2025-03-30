@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def aggregate_hourly():
-    """Aggregate minutely data into hourly averages"""
+    ## Aggregate minutely data into hourly averages
     try:
         with db.get_session() as session:
             devs = session.query(Device).all()
@@ -55,7 +55,7 @@ def aggregate_hourly():
 
 
 def aggregate_daily():
-    """Aggregate hourly data into daily averages"""
+    ## Aggregate hourly data into daily averages
     try:
         with db.get_session() as session:
             devs = session.query(Device).all()
@@ -88,7 +88,7 @@ def aggregate_daily():
 
 
 def aggregate_weekly():
-    """Aggregate daily data into weekly averages"""
+    ## Aggregate daily data into weekly averages
     try:
         with db.get_session() as session:
             devs = session.query(Device).all()
@@ -121,7 +121,7 @@ def aggregate_weekly():
 
 
 def data_processor():
-    """Process data aggregation at all levels"""
+    ## Process data aggregation at all levels
     try:
         aggregate_hourly()
         aggregate_daily()

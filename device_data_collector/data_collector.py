@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 def fetch_device_power(device_url):
-    """Fetch power consumption from a Shelly device"""
+    ## Fetch power consumption from a Shelly device
     try:
         # Try Gen 2 API first
         response = requests.get(f"{device_url}/rpc/Shelly.GetStatus", timeout=5)
@@ -32,7 +32,7 @@ def fetch_device_power(device_url):
 
 
 def collect_data():
-    """Collect power consumption data from all devices"""
+    ## Collect power consumption data from all devices
     try:
         with db.get_session() as session:
             # Get all devices

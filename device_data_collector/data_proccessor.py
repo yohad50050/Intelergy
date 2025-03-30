@@ -1,7 +1,6 @@
 from datetime import datetime
 from collections import deque
 
-# CHANGED THESE IMPORTS:
 from device_data_collector.models import (
     Device,
     MinutelyConsumption,
@@ -14,8 +13,8 @@ from device_data_collector.db import db
 
 def aggregate_hourly():
     db.session.expire_all()
-    devices = db.session.query(Device).all()
-    for d in devices:
+    devs = db.session.query(Device).all()
+    for d in devs:
         logs = (
             db.session.query(MinutelyConsumption)
             .filter_by(device_id=d.device_id)
@@ -34,20 +33,22 @@ def aggregate_hourly():
             db.session.add(h)
             for used in block:
                 db.session.delete(used)
-            zeros = (
+
+            zeroes = (
                 db.session.query(MinutelyConsumption)
                 .filter_by(power_consumption=0)
                 .all()
             )
-            for z in zeros:
+            for z in zeroes:
                 db.session.delete(z)
+
             db.session.commit()
 
 
 def aggregate_daily():
     db.session.expire_all()
-    devices = db.session.query(Device).all()
-    for d in devices:
+    devs = db.session.query(Device).all()
+    for d in devs:
         rows = (
             db.session.query(HistoricalHourlyConsumption)
             .filter_by(device_id=d.device_id)
@@ -73,8 +74,8 @@ def aggregate_daily():
 
 def aggregate_weekly():
     db.session.expire_all()
-    devices = db.session.query(Device).all()
-    for d in devices:
+    devs = db.session.query(Device).all()
+    for d in devs:
         rows = (
             db.session.query(DeviceDailyConsumption)
             .filter_by(device_id=d.device_id)

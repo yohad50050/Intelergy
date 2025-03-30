@@ -11,7 +11,6 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 
-# CHANGED THIS LINE:
 from device_data_collector.db import Base, session
 
 
@@ -22,7 +21,6 @@ class User(Base):
     user_name = Column(String(50), nullable=False)
     email = Column(String(100), unique=True, nullable=False)
     password = Column(String(100), nullable=False)
-    created_at = Column(DateTime, default=func.now())
 
     profiles = relationship(
         "Profile", back_populates="user", cascade="all, delete-orphan"
@@ -37,7 +35,6 @@ class Profile(Base):
     user_id = Column(
         Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
     )
-    created_at = Column(DateTime, default=func.now())
 
     user = relationship("User", back_populates="profiles")
     rooms = relationship("Room", back_populates="profile", cascade="all, delete-orphan")
@@ -51,7 +48,6 @@ class Room(Base):
     profile_id = Column(
         Integer, ForeignKey("profiles.profile_id", ondelete="CASCADE"), nullable=False
     )
-    created_at = Column(DateTime, default=func.now())
 
     profile = relationship("Profile", back_populates="rooms")
     devices = relationship(
@@ -70,7 +66,6 @@ class Device(Base):
     room_id = Column(
         Integer, ForeignKey("rooms.room_id", ondelete="CASCADE"), nullable=False
     )
-    created_at = Column(DateTime, default=func.now())
 
     room = relationship("Room", back_populates="devices")
     minutely_consumptions = relationship(
@@ -98,7 +93,6 @@ class MinutelyConsumption(Base):
     )
     power_consumption = Column(Float, nullable=False)
     time = Column(DateTime, nullable=False)
-    created_at = Column(DateTime, default=func.now())
 
     device = relationship("Device", back_populates="minutely_consumptions")
 
@@ -112,7 +106,6 @@ class HistoricalHourlyConsumption(Base):
     )
     start_time = Column(DateTime, nullable=False)
     average_historical_power = Column(Float, nullable=False)
-    created_at = Column(DateTime, default=func.now())
 
     device = relationship("Device", back_populates="historical_hourly_consumptions")
 
@@ -127,7 +120,6 @@ class DeviceDailyConsumption(Base):
     daily_average = Column(Float, nullable=False)
     date = Column(Date, nullable=False)
     status = Column(String(50), nullable=False, default="regular")
-    created_at = Column(DateTime, default=func.now())
 
     device = relationship("Device", back_populates="daily_consumptions")
 
@@ -141,6 +133,5 @@ class DeviceWeeklyConsumption(Base):
     )
     weekly_average = Column(Float, nullable=False)
     date = Column(DateTime, nullable=False)
-    created_at = Column(DateTime, default=func.now())
 
     device = relationship("Device", back_populates="weekly_consumptions")

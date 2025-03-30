@@ -2,7 +2,7 @@ import time
 import requests
 from datetime import datetime, timezone
 
-# CHANGED THESE THREE LINES:
+# Use package imports:
 from device_data_collector.models import (
     Profile,
     User,
@@ -31,6 +31,7 @@ def fetch_shelly_power(url):
 def create_new_profile():
     users = db.Session.query(User).all()
     if not users:
+        print("No users found. Let's create one first.")
         uname = input("Enter user name: ")
         uemail = input("Enter user email: ")
         upass = input("Enter user password: ")
@@ -38,6 +39,7 @@ def create_new_profile():
         db.Session.add(new_u)
         db.Session.commit()
         users = [new_u]
+
     print("Pick a user:")
     for u in users:
         print(u.user_id, u.user_name)
@@ -73,6 +75,7 @@ def create_new_device():
     if fetch_shelly_power(url) is None:
         print("Device unreachable.")
         return
+
     name = input("Device name: ").strip()
     dtype = input("Device type (TV/AC/etc.): ").strip()
 
@@ -100,6 +103,8 @@ def create_new_device():
             print(r.room_id, r.name)
         rchoice = input("Room ID: ").strip() or str(prof.rooms[0].room_id)
         chosen_room = db.Session.query(Room).filter_by(room_id=rchoice).first()
+        if not chosen_room:
+            chosen_room = prof.rooms[0]
 
     new_d = Device(
         device_url=url, name=name, status="ON", type=dtype, room_id=chosen_room.room_id

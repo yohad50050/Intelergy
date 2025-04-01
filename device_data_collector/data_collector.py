@@ -47,17 +47,22 @@ def collect_data():
             for device in devices:
                 power = fetch_device_power(device.device_url)
 
-                if power is not None:
+                if power > 1:
                     # Create new consumption record
                     new_consumption = MinutelyConsumption(
                         device_id=device.device_id,
                         power_consumption=power,
                         time=datetime.utcnow(),
                     )
+                    device.status = "ON"
                     session.add(new_consumption)
                     logger.info(
                         f"Collected power data for device {device.device_id}: {power}W"
                     )
+                elif power >= 0 and power <= 1:
+                    device.status = "OFF"
+                    logger.info(f"Device {device.device_id} is OFF (power={power})")
+
                 else:
                     logger.warning(
                         f"Failed to collect power data for device {device.device_id}"

@@ -14,6 +14,8 @@ from device_data_collector.models import (
     Device,
     MinutelyConsumption,
     DeviceWeeklyConsumption,
+    HourlyConsumption,
+    DeviceDailyConsumption,
 )
 from datetime import datetime, timezone
 import requests
@@ -170,41 +172,95 @@ def profile_view(profile_id):
 @login_required
 def get_device_power(device_id):
     app.logger.debug(f"Power request for device {device_id}")  # Debug log
+    time_range = request.args.get("time_range", "minutely")
+
     with db.get_session() as session:
         device = session.query(Device).filter_by(device_id=device_id).first()
         if not device:
             app.logger.error(f"Device {device_id} not found")  # Debug log
             return jsonify({"error": "Device not found"}), 404
 
-        # Get the latest minutely consumption
-        latest_consumption = (
-            session.query(MinutelyConsumption)
-            .filter_by(device_id=device_id)
-            .order_by(MinutelyConsumption.time.desc())
-            .first()
-        )
-        app.logger.debug(f"Latest consumption: {latest_consumption}")  # Debug log
+        # Verify the device belongs to the current user
+        room = session.query(Room).filter_by(room_id=device.room_id).first()
+        profile = session.query(Profile).filter_by(profile_id=room.profile_id).first()
+        if profile.user_id != current_user.id:
+            return jsonify({"error": "Access denied"}), 403
 
-        # Get the weekly average if it exists
-        weekly_consumption = (
-            session.query(DeviceWeeklyConsumption)
-            .filter_by(device_id=device_id)
-            .order_by(DeviceWeeklyConsumption.date.desc())
-            .first()
-        )
-        app.logger.debug(f"Weekly consumption: {weekly_consumption}")  # Debug log
+        response = {}
 
-        response = {
-            "power": (
-                float(latest_consumption.power_consumption) if latest_consumption else 0
-            ),
-            "weekly_average": (
-                float(weekly_consumption.weekly_average) if weekly_consumption else None
-            ),
-            "last_updated": (
-                latest_consumption.time.isoformat() if latest_consumption else None
-            ),
-        }
+        if time_range == "minutely":
+            # Get the latest minutely consumption
+            latest_consumption = (
+                session.query(MinutelyConsumption)
+                .filter_by(device_id=device_id)
+                .order_by(MinutelyConsumption.time.desc())
+                .first()
+            )
+            response = {
+                "power": (
+                    float(latest_consumption.power_consumption)
+                    if latest_consumption
+                    else None
+                ),
+                "last_updated": (
+                    latest_consumption.time.isoformat() if latest_consumption else None
+                ),
+            }
+        elif time_range == "hourly":
+            # Get the latest hourly consumption
+            hourly_consumption = (
+                session.query(HourlyConsumption)
+                .filter_by(device_id=device_id)
+                .order_by(HourlyConsumption.time.desc())
+                .first()
+            )
+            response = {
+                "hourly_average": (
+                    float(hourly_consumption.power_consumption)
+                    if hourly_consumption
+                    else None
+                ),
+                "last_updated": (
+                    hourly_consumption.time.isoformat() if hourly_consumption else None
+                ),
+            }
+        elif time_range == "daily":
+            # Get the latest daily consumption
+            daily_consumption = (
+                session.query(DeviceDailyConsumption)
+                .filter_by(device_id=device_id)
+                .order_by(DeviceDailyConsumption.date.desc())
+                .first()
+            )
+            response = {
+                "daily_average": (
+                    float(daily_consumption.daily_average)
+                    if daily_consumption
+                    else None
+                ),
+                "last_updated": (
+                    daily_consumption.date.isoformat() if daily_consumption else None
+                ),
+            }
+        elif time_range == "weekly":
+            # Get the latest weekly consumption
+            weekly_consumption = (
+                session.query(DeviceWeeklyConsumption)
+                .filter_by(device_id=device_id)
+                .order_by(DeviceWeeklyConsumption.date.desc())
+                .first()
+            )
+            response = {
+                "weekly_average": (
+                    float(weekly_consumption.weekly_average)
+                    if weekly_consumption
+                    else None
+                ),
+                "last_updated": (
+                    weekly_consumption.date.isoformat() if weekly_consumption else None
+                ),
+            }
+
         app.logger.debug(f"Sending response: {response}")  # Debug log
         return jsonify(response)
 

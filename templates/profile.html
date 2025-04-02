@@ -58,10 +58,23 @@
             </form>
         </div>
 
+        <!-- Time Range Selector -->
+        <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <div class="flex items-center justify-between">
+                <h2 class="text-xl font-bold text-blue-900">טווח זמן לצריכת חשמל</h2>
+                <select id="timeRange" class="rounded-lg border-blue-200 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <option value="minutely">דקתי (זמן אמת)</option>
+                    <option value="hourly">שעתי</option>
+                    <option value="daily">יומי</option>
+                    <option value="weekly">שבועי</option>
+                </select>
+            </div>
+        </div>
+
         <!-- Rooms List -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {% for room in rooms %}
-            <div class="bg-gradient-to-br from-blue-50 to-green-50 rounded-lg shadow p-6">
+            <div class="bg-gradient-to-br from-blue-50 to-green-50 rounded-lg shadow p-6" data-room-id="{{ room.room_id }}">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-semibold text-blue-900">{{ room.name }}</h2>
                     <button onclick="showAddDeviceForm('{{ room.room_id }}')" 
@@ -121,8 +134,8 @@
                             </div>
                             <div class="flex items-center gap-3">
                                 <div class="power-value text-right" data-device-id="{{ device.device_id }}">
-                                    <div class="font-bold text-blue-900">--W</div>
-                                    <div class="text-xs text-blue-600">Loading...</div>
+                                    <div class="font-bold text-blue-900">ממתין לנתונים...</div>
+                                    <div class="text-xs text-blue-600">טוען...</div>
                                 </div>
                                 <form class="ml-2">
                                     <button type="button" 
@@ -149,17 +162,10 @@
             <h2 class="text-xl font-bold text-blue-900 mb-4 bg-yellow-300 inline-block px-4 py-1 rounded-lg">לפי חדרים</h2>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {% for room in rooms %}
-                <div class="bg-gradient-to-r from-blue-100 to-green-100 rounded-lg p-4 text-center">
+                <div class="bg-gradient-to-r from-blue-100 to-green-100 rounded-lg p-4 text-center" data-room-id="{{ room.room_id }}">
                     <h3 class="text-lg font-bold text-blue-900">{{ room.name }}</h3>
                     <div class="mt-2">
-                        {% set total = [0] %}
-                        {% for device in room.devices %}
-                            {% set latest = device.minutely_consumptions|sort(attribute='time')|last %}
-                            {% if latest %}
-                                {% set _ = total.append(total.pop() + latest.power_consumption) %}
-                            {% endif %}
-                        {% endfor %}
-                        <span class="text-2xl font-bold text-blue-900">{{ "%.1f"|format(total[0]) }}W</span>
+                        <span class="text-2xl font-bold text-blue-900" data-room-total-id="{{ room.room_id }}">0.000W</span>
                     </div>
                 </div>
                 {% endfor %}
@@ -215,29 +221,119 @@ function toggleDevice(deviceId, button) {
     });
 }
 
-// Update power values every 5 seconds
-setInterval(updatePowerValues, 5000);
+function formatPowerValue(value) {
+    if (value === 0) return '0W';
+    if (!value) return 'ממתין לנתונים...';
+    
+    // Round to 2 decimal places
+    const rounded = Math.round(value * 100) / 100;
+    
+    // Convert to string and remove unnecessary trailing zeros
+    let formatted = rounded.toString();
+    
+    // If it's a whole number, don't show decimal places
+    if (formatted.includes('.')) {
+        formatted = formatted.replace(/\.?0+$/, '');
+    }
+    
+    return formatted + 'W';
+}
+
 function updatePowerValues() {
+    const timeRange = document.getElementById('timeRange').value;
+    const roomTotals = {};
+
+    // Initialize room totals
+    document.querySelectorAll('[data-room-id]').forEach(element => {
+        roomTotals[element.dataset.roomId] = 0;
+    });
+
+    // Update device values and calculate room totals
     document.querySelectorAll('.power-value').forEach(element => {
         const deviceId = element.dataset.deviceId;
-        fetch(`/api/device/${deviceId}/power`)
+        const roomId = element.closest('[data-room-id]').dataset.roomId;
+
+        fetch(`/api/device/${deviceId}/power?time_range=${timeRange}`)
             .then(response => response.json())
             .then(data => {
-                if (data.power !== undefined) {
-                    const powerDiv = element.querySelector('.font-bold');
-                    const updateDiv = element.querySelector('.text-xs');
-                    powerDiv.textContent = `${data.power.toFixed(1)}W`;
-                    if (data.last_updated) {
-                        const lastUpdate = new Date(data.last_updated);
-                        updateDiv.textContent = `Last update: ${lastUpdate.toLocaleTimeString()}`;
-                    }
+                const powerDiv = element.querySelector('.font-bold');
+                const updateDiv = element.querySelector('.text-xs');
+                
+                let powerValue = 0;
+                let powerText = 'ממתין לנתונים...';
+                let updateText = '';
+                
+                if (timeRange === 'hourly' && data.hourly_average !== undefined && data.hourly_average !== null) {
+                    powerValue = data.hourly_average;
+                    powerText = formatPowerValue(data.hourly_average);
+                    updateText = 'ממוצע שעתי';
+                } else if (timeRange === 'daily' && data.daily_average !== undefined && data.daily_average !== null) {
+                    powerValue = data.daily_average;
+                    powerText = formatPowerValue(data.daily_average);
+                    updateText = 'ממוצע יומי';
+                } else if (timeRange === 'weekly' && data.weekly_average !== undefined && data.weekly_average !== null) {
+                    powerValue = data.weekly_average;
+                    powerText = formatPowerValue(data.weekly_average);
+                    updateText = 'ממוצע שבועי';
+                } else if (timeRange === 'minutely' && data.power !== undefined && data.power !== null) {
+                    powerValue = data.power;
+                    powerText = formatPowerValue(data.power);
+                    updateText = data.last_updated ? `עדכון אחרון: ${new Date(data.last_updated).toLocaleTimeString()}` : 'ממתין לנתונים...';
                 }
+                
+                powerDiv.textContent = powerText;
+                updateDiv.textContent = updateText;
+
+                // Add to room total
+                if (!isNaN(powerValue)) {
+                    roomTotals[roomId] = (roomTotals[roomId] || 0) + powerValue;
+                }
+
+                // Update room totals after all devices are processed
+                updateRoomTotals(roomTotals, timeRange);
             })
-            .catch(error => console.error('Error:', error));
+            .catch(error => {
+                console.error('Error:', error);
+                const powerDiv = element.querySelector('.font-bold');
+                const updateDiv = element.querySelector('.text-xs');
+                powerDiv.textContent = 'ממתין לנתונים...';
+                updateDiv.textContent = 'שגיאה בטעינת נתונים';
+            });
     });
 }
 
-// Initial power values update
+function updateRoomTotals(roomTotals, timeRange) {
+    for (const [roomId, total] of Object.entries(roomTotals)) {
+        const roomTotalElement = document.querySelector(`[data-room-total-id="${roomId}"]`);
+        if (roomTotalElement) {
+            roomTotalElement.textContent = formatPowerValue(total);
+        }
+    }
+}
+
+// Add event listener for time range changes
+document.getElementById('timeRange').addEventListener('change', updatePowerValues);
+
+// Update power values every 5 seconds for minutely view, every minute for other views
+let updateInterval;
+function updateIntervalBasedOnTimeRange() {
+    const timeRange = document.getElementById('timeRange').value;
+    if (updateInterval) {
+        clearInterval(updateInterval);
+    }
+    
+    if (timeRange === 'minutely') {
+        updateInterval = setInterval(updatePowerValues, 5000); // Update every 5 seconds for real-time
+    } else {
+        updateInterval = setInterval(updatePowerValues, 60000); // Update every minute for other views
+    }
+}
+
+// Update interval when time range changes
+document.getElementById('timeRange').addEventListener('change', updateIntervalBasedOnTimeRange);
+
+// Initial setup
+updateIntervalBasedOnTimeRange();
 updatePowerValues();
 </script>
 {% endblock %}

@@ -1,11 +1,11 @@
-from datetime import datetime, timedelta
-from sqlalchemy import func
-from device_data_collector.models import Device, MinutelyConsumption, HourlyConsumption
-from device_data_collector.db import db
 import logging
-from collections import deque
+from datetime import datetime
+from sqlalchemy import desc
+from device_data_collector.db import db
 from device_data_collector.models import (
-    HistoricalHourlyConsumption,
+    Device,
+    MinutelyConsumption,
+    HourlyConsumption,
     DeviceDailyConsumption,
     DeviceWeeklyConsumption,
 )
@@ -14,123 +14,149 @@ logger = logging.getLogger(__name__)
 
 
 def aggregate_hourly():
-    ## Aggregate minutely data into hourly averages
+    """
+    Find the 60 newest minutely logs per device, if exactly 60 exist, create HourlyConsumption
+    and delete them.
+    """
     try:
         with db.get_session() as session:
-            devs = session.query(Device).all()
-            for d in devs:
-                logs = (
+            any_aggregated = False
+            devices = session.query(Device).all()
+
+            for device in devices:
+                recent_minutely = (
                     session.query(MinutelyConsumption)
-                    .filter_by(device_id=d.device_id)
-                    .filter(MinutelyConsumption.power_consumption > 0)
-                    .order_by(MinutelyConsumption.time.asc())
+                    .filter(MinutelyConsumption.device_id == device.device_id)
+                    .filter(MinutelyConsumption.power_consumption > 1)
+                    .order_by(desc(MinutelyConsumption.time))
+                    .limit(60)
                     .all()
                 )
-                q = deque(logs)
-                while len(q) >= 60:
-                    block = [q.popleft() for _ in range(60)]
-                    avg = sum(x.power_consumption for x in block) / 60
-                    start = block[0].time.replace(second=0, microsecond=0)
-                    h = HistoricalHourlyConsumption(
-                        device_id=d.device_id,
-                        start_time=start,
-                        average_historical_power=avg,
-                    )
-                    session.add(h)
-                    for used in block:
-                        session.delete(used)
 
-                    zeroes = (
-                        session.query(MinutelyConsumption)
-                        .filter_by(power_consumption=0)
-                        .all()
-                    )
-                    for z in zeroes:
-                        session.delete(z)
+                if len(recent_minutely) == 60:
+                    logs_sorted = sorted(recent_minutely, key=lambda x: x.time)
+                    avg_power = sum(m.power_consumption for m in logs_sorted) / 60
+                    start_time = logs_sorted[0].time
 
-            logger.info("Hourly aggregation completed successfully")
+                    hour_entry = HourlyConsumption(
+                        device_id=device.device_id,
+                        power_consumption=avg_power,
+                        time=start_time,
+                    )
+                    session.add(hour_entry)
+
+                    for m in recent_minutely:
+                        session.delete(m)
+
+                    any_aggregated = True
+
+            if any_aggregated:
+                logger.info("Hourly aggregation done.")
     except Exception as e:
         logger.error(f"Error in hourly aggregation: {str(e)}")
         raise
 
 
 def aggregate_daily():
-    ## Aggregate hourly data into daily averages
+    """
+    Find the 24 newest hourly logs (aggregated=False) per device, if exactly 24 then
+    create DeviceDailyConsumption and mark them aggregated.
+    """
     try:
         with db.get_session() as session:
-            devs = session.query(Device).all()
-            for d in devs:
-                rows = (
-                    session.query(HistoricalHourlyConsumption)
-                    .filter_by(device_id=d.device_id)
-                    .order_by(HistoricalHourlyConsumption.start_time.asc())
+            any_aggregated = False
+            devices = session.query(Device).all()
+
+            for device in devices:
+                recent_hourly = (
+                    session.query(HourlyConsumption)
+                    .filter(HourlyConsumption.device_id == device.device_id)
+                    .filter(HourlyConsumption.aggregated == False)
+                    .order_by(desc(HourlyConsumption.time))
+                    .limit(24)
                     .all()
                 )
-                q = deque(rows)
-                while len(q) >= 24:
-                    block = [q.popleft() for _ in range(24)]
-                    avg = sum(x.average_historical_power for x in block) / 24
-                    day_date = block[0].start_time.date()
-                    daily = DeviceDailyConsumption(
-                        device_id=d.device_id,
-                        daily_average=avg,
+
+                if len(recent_hourly) == 24:
+                    logs_sorted = sorted(recent_hourly, key=lambda x: x.time)
+                    avg_day = sum(h.power_consumption for h in logs_sorted) / 24
+                    day_date = logs_sorted[0].time.date()
+
+                    daily_entry = DeviceDailyConsumption(
+                        device_id=device.device_id,
+                        daily_average=avg_day,
                         date=day_date,
                         status="regular",
                     )
-                    session.add(daily)
-                    for used in block:
-                        session.delete(used)
+                    session.add(daily_entry)
 
-            logger.info("Daily aggregation completed successfully")
+                    for h in recent_hourly:
+                        h.aggregated = True
+
+                    any_aggregated = True
+
+            if any_aggregated:
+                logger.info("Daily aggregation done.")
     except Exception as e:
         logger.error(f"Error in daily aggregation: {str(e)}")
         raise
 
 
 def aggregate_weekly():
-    ## Aggregate daily data into weekly averages
+    """
+    Find the 7 newest daily logs (aggregated=False) per device, if exactly 7 then
+    create DeviceWeeklyConsumption and mark them aggregated.
+    """
     try:
         with db.get_session() as session:
-            devs = session.query(Device).all()
-            for d in devs:
-                rows = (
+            any_aggregated = False
+            devices = session.query(Device).all()
+
+            for device in devices:
+                recent_daily = (
                     session.query(DeviceDailyConsumption)
-                    .filter_by(device_id=d.device_id)
-                    .order_by(DeviceDailyConsumption.date.asc())
+                    .filter(DeviceDailyConsumption.device_id == device.device_id)
+                    .filter(DeviceDailyConsumption.aggregated == False)
+                    .order_by(desc(DeviceDailyConsumption.date))
+                    .limit(7)
                     .all()
                 )
-                q = deque(rows)
-                while len(q) >= 7:
-                    block = [q.popleft() for _ in range(7)]
-                    avg = sum(x.daily_average for x in block) / 7
-                    wstart = block[0].date
-                    weekly = DeviceWeeklyConsumption(
-                        device_id=d.device_id,
-                        weekly_average=avg,
-                        date=wstart,
+
+                if len(recent_daily) == 7:
+                    logs_sorted = sorted(recent_daily, key=lambda x: x.date)
+                    avg_week = sum(d.daily_average for d in logs_sorted) / 7
+                    start_day = logs_sorted[0].date
+
+                    weekly_entry = DeviceWeeklyConsumption(
+                        device_id=device.device_id,
+                        weekly_average=avg_week,
+                        date=start_day,
                         status="regular",
                     )
-                    session.add(weekly)
-                    for used in block:
-                        session.delete(used)
+                    session.add(weekly_entry)
 
-            logger.info("Weekly aggregation completed successfully")
+                    for d in recent_daily:
+                        d.aggregated = True
+
+                    any_aggregated = True
+
+            if any_aggregated:
+                logger.info("Weekly aggregation done.")
     except Exception as e:
         logger.error(f"Error in weekly aggregation: {str(e)}")
         raise
 
 
 def data_processor():
-    ## Process data aggregation at all levels
+    """
+    Runs the entire chain: minutely->hourly, hourly->daily, daily->weekly.
+    Called each minute in data_collector so logs stay up-to-date.
+    """
     try:
         aggregate_hourly()
         aggregate_daily()
         aggregate_weekly()
-        logger.info("Data processing completed successfully")
+        logger.info("Data processing completed.")
     except Exception as e:
         logger.error(f"Error in data processing: {str(e)}")
         raise
-
-
-if __name__ == "__main__":
-    data_processor()

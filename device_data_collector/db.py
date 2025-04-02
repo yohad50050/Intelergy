@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from urllib.parse import quote_plus
 from contextlib import contextmanager
 from sqlalchemy import create_engine
-from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 import logging
 
@@ -75,6 +75,7 @@ class DatabaseHandler:
             raise
 
     def drop_tables(self):
+        """Careful: This will drop ALL tables mapped by Base.metadata!"""
         try:
             Base.metadata.drop_all(self.engine)
             logger.info("Database tables dropped successfully")

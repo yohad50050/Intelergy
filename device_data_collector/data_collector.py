@@ -1,106 +1,87 @@
 import time
 import logging
-from datetime import datetime
 import requests
-from device_data_collector.models import Device, MinutelyConsumption
+from datetime import datetime
+
 from device_data_collector.db import db
-from device_data_collector.data_processor import aggregate_hourly
+from device_data_collector.models import Device, MinutelyConsumption
+from device_data_collector.data_processor import data_processor
 
 logger = logging.getLogger(__name__)
 
 
 def fetch_device_power(device_url):
-    ## Fetch power consumption from a Shelly device
+    """Fetch Shelly device power; None if unreachable."""
     try:
-        # Try Gen 2 API first
-        response = requests.get(f"{device_url}/rpc/Shelly.GetStatus", timeout=5)
-        if response.status_code == 200:
-            data = response.json()
+        resp = requests.get(f"{device_url}/rpc/Shelly.GetStatus", timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
             return data.get("switch:0", {}).get("apower", 0.0)
-
-        # If that fails, try Gen 1 API
-        if response.status_code == 404:
-            response = requests.get(f"{device_url}/status", timeout=5)
-            if response.status_code == 200:
-                data = response.json()
+        if resp.status_code == 404:
+            resp = requests.get(f"{device_url}/status", timeout=5)
+            if resp.status_code == 200:
+                data = resp.json()
                 return data.get("meters", [{}])[0].get("power", 0.0)
-
         return None
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error fetching power data: {str(e)}")
+    except requests.exceptions.RequestException as exc:
+        logger.error(f"Error fetching power data: {str(exc)}")
         return None
 
 
 def collect_data():
-    ## Collect power consumption data from all devices
+    """Collect power data if >1W, otherwise mark device as OFF."""
     try:
         with db.get_session() as session:
-            # Get all devices
             devices = session.query(Device).all()
-
             if not devices:
-                logger.info(
-                    "No devices found in database. Waiting for devices to be added..."
-                )
+                logger.info("No devices found, waiting...")
                 return
 
             for device in devices:
                 power = fetch_device_power(device.device_url)
-
-                if power > 1:
-                    # Create new consumption record
-                    new_consumption = MinutelyConsumption(
+                if power and power > 1:
+                    usage = MinutelyConsumption(
                         device_id=device.device_id,
                         power_consumption=power,
-                        time=datetime.utcnow(),
+                        time=datetime.now(),
                     )
                     device.status = "ON"
-                    session.add(new_consumption)
-                    logger.info(
-                        f"Collected power data for device {device.device_id}: {power}W"
-                    )
-                elif power >= 0 and power <= 1:
-                    device.status = "OFF"
-                    logger.info(f"Device {device.device_id} is OFF (power={power})")
-
+                    session.add(usage)
+                    session.commit()
+                    logger.info(f"Device {device.device_id}: {power}W")
                 else:
-                    logger.warning(
-                        f"Failed to collect power data for device {device.device_id}"
+                    device.status = "OFF"
+                    logger.info(
+                        f"Device {device.device_id} is OFF (power={power or 0.0})"
                     )
-
-            session.commit()
-
-    except Exception as e:
-        logger.error(f"Error collecting data: {str(e)}")
+    except Exception as err:
+        logger.error(f"Error collecting data: {str(err)}")
         raise
 
 
 def run_data_collector():
-    """Main function to run the data collection process"""
+    """
+    Check clock each second.
+    If minute changes, collect & process.
+    """
     logger.info("Starting data collector...")
-
-    hourly_counter = 0
+    current_minute = datetime.now().minute
 
     while True:
         try:
-            # Collect data every minute
-            collect_data()
-
-            # Increment counter and check if an hour has passed
-            hourly_counter += 1
-            if hourly_counter >= 60:
-                aggregate_hourly()
-                hourly_counter = 0
-
-            # Wait for next minute
-            time.sleep(60)
-
-        except Exception as e:
-            logger.error(f"Error in data collector: {str(e)}")
-            time.sleep(60)  # Wait a minute before retrying
+            now = datetime.now()
+            if now.minute != current_minute:
+                current_minute = now.minute
+                collect_data()
+                data_processor()
+            time.sleep(1)
+        except Exception as err:
+            logger.error(f"Error in collector loop: {str(err)}")
+            time.sleep(5)
 
 
 if __name__ == "__main__":
+    # db.create_tables()  # Run once if needed
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",

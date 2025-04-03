@@ -1,4 +1,5 @@
 import logging
+import time
 from datetime import datetime
 from sqlalchemy import desc
 from device_data_collector.db import db
@@ -36,12 +37,11 @@ def aggregate_hourly():
                 if len(recent_minutely) == 60:
                     logs_sorted = sorted(recent_minutely, key=lambda x: x.time)
                     avg_power = sum(m.power_consumption for m in logs_sorted) / 60
-                    start_time = logs_sorted[0].time
 
                     hour_entry = HourlyConsumption(
                         device_id=device.device_id,
                         power_consumption=avg_power,
-                        time=start_time,
+                        time=datetime.now(),
                     )
                     session.add(hour_entry)
 
@@ -80,12 +80,11 @@ def aggregate_daily():
                 if len(recent_hourly) == 24:
                     logs_sorted = sorted(recent_hourly, key=lambda x: x.time)
                     avg_day = sum(h.power_consumption for h in logs_sorted) / 24
-                    day_date = logs_sorted[0].time.date()
 
                     daily_entry = DeviceDailyConsumption(
                         device_id=device.device_id,
                         daily_average=avg_day,
-                        date=day_date,
+                        date=datetime.now(),
                         status="regular",
                     )
                     session.add(daily_entry)
@@ -125,12 +124,11 @@ def aggregate_weekly():
                 if len(recent_daily) == 7:
                     logs_sorted = sorted(recent_daily, key=lambda x: x.date)
                     avg_week = sum(d.daily_average for d in logs_sorted) / 7
-                    start_day = logs_sorted[0].date
 
                     weekly_entry = DeviceWeeklyConsumption(
                         device_id=device.device_id,
                         weekly_average=avg_week,
-                        date=start_day,
+                        date=datetime.now(),
                         status="regular",
                     )
                     session.add(weekly_entry)
@@ -148,15 +146,21 @@ def aggregate_weekly():
 
 
 def data_processor():
-    """
-    Runs the entire chain: minutely->hourly, hourly->daily, daily->weekly.
-    Called each minute in data_collector so logs stay up-to-date.
-    """
-    try:
-        aggregate_hourly()
-        aggregate_daily()
-        aggregate_weekly()
-        logger.info("Data processing completed.")
-    except Exception as e:
-        logger.error(f"Error in data processing: {str(e)}")
-        raise
+    current_minute = datetime.now().minute
+    while True:
+        now = datetime.now()
+        if now.minute != current_minute:
+            current_minute = now.minute
+            try:
+                aggregate_hourly()
+                aggregate_daily()
+                aggregate_weekly()
+                logger.info("Data processing completed.")
+            except Exception as e:
+                logger.error(f"Error in data processing: {str(e)}")
+                raise
+        time.sleep(5)
+        
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    data_processor()

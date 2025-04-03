@@ -3,6 +3,8 @@ import logging
 import requests
 from datetime import datetime
 
+# data_collector.py (inside device_data_collector folder)
+
 from device_data_collector.db import db
 from device_data_collector.models import Device, MinutelyConsumption
 from device_data_collector.data_processor import data_processor

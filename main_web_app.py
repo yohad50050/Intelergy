@@ -189,15 +189,22 @@ def get_device_power(device_id):
         response = {}
 
         if time_range == "minutely":
-            # Get real-time power value for minutely view
-            current_power = fetch_shelly_power(device.device_url)
+            # Get the latest minutely consumption
+            latest_consumption = (
+                session.query(MinutelyConsumption)
+                .filter_by(device_id=device_id)
+                .order_by(MinutelyConsumption.time.desc())
+                .first()
+            )
             response = {
                 "power": (
-                    0.0
-                    if current_power is None or current_power <= 1
-                    else float(current_power)
+                    float(latest_consumption.power_consumption)
+                    if latest_consumption
+                    else None
                 ),
-                "last_updated": datetime.now().isoformat(),
+                "last_updated": (
+                    latest_consumption.time.isoformat() if latest_consumption else None
+                ),
             }
         elif time_range == "hourly":
             # Get the latest hourly consumption

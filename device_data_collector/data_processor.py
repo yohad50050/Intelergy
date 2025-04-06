@@ -15,10 +15,10 @@ logger = logging.getLogger(__name__)
 
 
 def aggregate_hourly():
-    """
-    Find the 60 newest minutely logs per device, if exactly 60 exist, create HourlyConsumption
-    and delete them.
-    """
+
+    ## Find the 60 newest minutely logs per device, if exactly 60 exist, create HourlyConsumption
+    ## and delete them.
+
     try:
         with db.get_session() as session:
             any_aggregated = False
@@ -58,10 +58,10 @@ def aggregate_hourly():
 
 
 def aggregate_daily():
-    """
-    Find the 24 newest hourly logs (aggregated=False) per device, if exactly 24 then
-    create DeviceDailyConsumption and mark them aggregated.
-    """
+
+    ## Find the 24 newest hourly logs (aggregated=False) per device, if exactly 24 then
+    ## create DeviceDailyConsumption and mark them aggregated.
+
     try:
         with db.get_session() as session:
             any_aggregated = False
@@ -102,10 +102,10 @@ def aggregate_daily():
 
 
 def aggregate_weekly():
-    """
-    Find the 7 newest daily logs (aggregated=False) per device, if exactly 7 then
-    create DeviceWeeklyConsumption and mark them aggregated.
-    """
+
+    ## Find the 7 newest daily logs (aggregated=False) per device, if exactly 7 then
+    ## create DeviceWeeklyConsumption and mark them aggregated.
+
     try:
         with db.get_session() as session:
             any_aggregated = False
@@ -160,7 +160,8 @@ def data_processor():
                 logger.error(f"Error in data processing: {str(e)}")
                 raise
         time.sleep(5)
-        
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     data_processor()

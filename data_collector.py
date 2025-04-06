@@ -7,13 +7,13 @@ from datetime import datetime
 
 from device_data_collector.db import db
 from device_data_collector.models import Device, MinutelyConsumption
-from device_data_collector.data_processor import data_processor
+
 
 logger = logging.getLogger(__name__)
 
 
 def fetch_device_power(device_url):
-    """Fetch Shelly device power; None if unreachable."""
+    ## Fetch Shelly device power; None if unreachable.
     try:
         resp = requests.get(f"{device_url}/rpc/Shelly.GetStatus", timeout=5)
         if resp.status_code == 200:
@@ -31,7 +31,7 @@ def fetch_device_power(device_url):
 
 
 def collect_data():
-    """Collect power data if >1W, otherwise mark device as OFF."""
+    ## Collect power data if >1W, otherwise mark device as OFF.
     try:
         with db.get_session() as session:
             devices = session.query(Device).all()
@@ -62,10 +62,10 @@ def collect_data():
 
 
 def run_data_collector():
-    """
-    Check clock each second.
-    If minute changes, collect & process.
-    """
+
+    ## Check clock each second.
+    ## If minute changes, collect & process.
+
     logger.info("Starting data collector...")
     current_minute = datetime.now().minute
 
@@ -75,7 +75,6 @@ def run_data_collector():
             if now.minute != current_minute:
                 current_minute = now.minute
                 collect_data()
-                data_processor()
             time.sleep(1)
         except Exception as err:
             logger.error(f"Error in collector loop: {str(err)}")

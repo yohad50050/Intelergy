@@ -75,7 +75,7 @@ class DatabaseHandler:
             raise
 
     def drop_tables(self):
-        """Careful: This will drop ALL tables mapped by Base.metadata!"""
+        ## Careful: This will drop ALL tables mapped by Base.metadata!
         try:
             Base.metadata.drop_all(self.engine)
             logger.info("Database tables dropped successfully")
